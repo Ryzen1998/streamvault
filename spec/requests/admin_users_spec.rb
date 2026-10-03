@@ -61,6 +61,12 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response.body).not_to include("chosen-password-1")
     end
 
+    it "can create another admin" do
+      post admin_users_path, params: { user: { email: "second-admin@example.com", admin: "1" } }
+
+      expect(User.find_by!(email: "second-admin@example.com")).to be_admin
+    end
+
     it "rejects invalid accounts" do
       post admin_users_path, params: { user: { email: "not-an-email" } }
 

@@ -21,6 +21,7 @@ module Admin
 
     def create
       @user = User.new(create_params)
+      assign_flag(:admin) { |admin| @user.admin = admin }
       chosen_password = params.dig(:user, :password).presence
       @user.password = @user.password_confirmation = chosen_password || generated_password
 
@@ -36,11 +37,9 @@ module Admin
     end
 
     def update
-      @user.assign_attributes(update_params.except(:disabled))
-      if update_params.key?(:disabled)
-        disable = ActiveModel::Type::Boolean.new.cast(update_params[:disabled])
-        @user.disabled_at = disable ? (@user.disabled_at || Time.current) : nil
-      end
+      @user.assign_attributes(update_params)
+      assign_flag(:admin) { |admin| @user.admin = admin }
+      assign_flag(:disabled) { |disable| @user.disabled_at = disable ? (@user.disabled_at || Time.current) : nil }
 
       if self_lockout?
         @user.errors.add(:base, "You can't remove your own admin access or disable your own account.")
@@ -75,11 +74,17 @@ module Admin
     end
 
     def create_params
-      params.require(:user).permit(:email, :display_name, :admin)
+      params.require(:user).permit(:email, :display_name)
     end
 
     def update_params
-      params.require(:user).permit(:display_name, :admin, :disabled)
+      params.require(:user).permit(:display_name)
+    end
+
+    # Role and access flags are set one at a time, never mass-assigned, and
+    # only when the form sent them.
+    def assign_flag(name)
+      yield ActiveModel::Type::Boolean.new.cast(params[:user][name]) if params[:user].key?(name)
     end
 
     def self_lockout?
