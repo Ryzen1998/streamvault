@@ -53,6 +53,9 @@ Rails.application.routes.draw do
   get "hls/:id/:segment", to: "hls#segment", as: :hls_segment, constraints: { segment: /\d+\.ts/ }
   post "hls/:id/stop", to: "hls#stop", as: :hls_stop
 
+  # Per-account watch statistics
+  get "stats", to: "stats#show", as: :stats
+
   # Settings
   get "settings", to: "settings#show", as: :settings
   patch "settings", to: "settings#update"

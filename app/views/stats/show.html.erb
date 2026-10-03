@@ -1,0 +1,103 @@
+<div class="px-6 py-8 max-w-4xl">
+  <h1 class="text-3xl font-bold text-white">Your stats</h1>
+  <p class="text-sm text-sv-text-muted mt-1 mb-8">Built from your saved playback positions. Watch time counts up to the furthest point you reached in each title.</p>
+
+  <% if @stats.empty? %>
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border text-center">
+      <p class="text-sv-text-muted">Nothing watched yet. Stats appear once you start playing something.</p>
+    </div>
+  <% else %>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <% [
+           [ "Time watched", watch_time(@stats.watched_seconds) ],
+           [ "Movies finished", number_with_delimiter(@stats.movies_finished) ],
+           [ "Episodes finished", number_with_delimiter(@stats.episodes_finished) ],
+           [ "In progress", number_with_delimiter(@stats.in_progress_count) ]
+         ].each do |label, value| %>
+        <div class="bg-sv-surface rounded-xl p-4 border border-sv-border">
+          <p class="text-xs text-sv-text-muted"><%= label %></p>
+          <p class="text-2xl font-semibold text-white mt-1"><%= value %></p>
+        </div>
+      <% end %>
+    </div>
+
+    <% peak = [ @stats.activity.map(&:count).max, 1 ].max %>
+    <figure class="bg-sv-surface rounded-xl p-5 border border-sv-border mb-8">
+      <figcaption>
+        <h2 class="text-lg font-semibold text-white">Activity, last 30 days</h2>
+        <p class="text-xs text-sv-text-muted mt-0.5">Movies and episodes, counted on the day you last watched them.</p>
+      </figcaption>
+
+      <div class="mt-4 flex gap-2">
+        <div class="flex flex-col justify-between h-32 w-6 text-right text-xs text-sv-text-muted tabular-nums" aria-hidden="true">
+          <span class="-mt-2"><%= peak %></span>
+          <span class="-mb-2">0</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="relative h-32 flex items-end gap-[2px] border-b border-sv-border" role="list" aria-label="Titles watched per day">
+            <div class="absolute inset-x-0 top-0 border-t border-sv-border" aria-hidden="true"></div>
+            <% @stats.activity.each_with_index do |day, index| %>
+              <div class="group relative flex-1 h-full flex items-end justify-center outline-none" role="listitem" tabindex="0"
+                   aria-label="<%= day.date.to_fs(:long) %>: <%= pluralize(day.count, "title") %>">
+                <% if day.count.positive? %>
+                  <div class="w-full max-w-6 rounded-t bg-sv-accent group-hover:bg-sv-accent-hover group-focus:bg-sv-accent-hover"
+                       style="height: <%= (day.count * 100.0 / peak).round(1) %>%"></div>
+                <% end %>
+                <div class="pointer-events-none absolute bottom-full mb-2 <%= index >= @stats.activity.size - 6 ? "right-0" : "left-0" %> hidden group-hover:block group-focus:block z-10 whitespace-nowrap rounded-md bg-sv-bg border border-sv-border px-2 py-1 text-xs shadow-lg">
+                  <span class="font-semibold text-white"><%= pluralize(day.count, "title") %></span>
+                  <span class="text-sv-text-muted"><%= day.date.strftime("%b %-d") %></span>
+                </div>
+              </div>
+            <% end %>
+          </div>
+          <div class="flex justify-between text-xs text-sv-text-muted mt-1.5" aria-hidden="true">
+            <span><%= @stats.activity.first.date.strftime("%b %-d") %></span>
+            <span>Today</span>
+          </div>
+        </div>
+      </div>
+
+      <details class="mt-4">
+        <summary class="text-xs text-sv-accent cursor-pointer">Show as table</summary>
+        <table class="mt-2 text-xs w-full max-w-xs">
+          <thead>
+            <tr class="text-left text-sv-text-muted">
+              <th class="py-1 font-medium">Day</th>
+              <th class="py-1 font-medium text-right">Titles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @stats.activity.reverse_each do |day| %>
+              <tr class="border-t border-sv-border">
+                <td class="py-1 text-sv-text"><%= day.date.to_fs(:long) %></td>
+                <td class="py-1 text-right text-sv-text tabular-nums"><%= day.count %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </details>
+    </figure>
+
+    <% if @stats.top_shows.any? %>
+      <section>
+        <h2 class="text-lg font-semibold text-white">Most watched shows</h2>
+        <p class="text-xs text-sv-text-muted mt-0.5 mb-3"><%= pluralize(@stats.shows_count, "show") %> started in total.</p>
+        <div class="space-y-2">
+          <% @stats.top_shows.each do |show| %>
+            <%= link_to content_path(type: "show", imdb_id: show.imdb_id),
+                  class: "flex items-center gap-4 p-3 bg-sv-surface rounded-lg hover:bg-sv-surface-hover transition-colors",
+                  data: { page_loader: "link" } do %>
+              <% if show.poster_url %>
+                <img src="<%= show.poster_url %>" alt="" class="w-10 h-15 object-cover rounded">
+              <% end %>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-white truncate"><%= show.title %></p>
+                <p class="text-xs text-sv-text-muted"><%= pluralize(show.episodes_watched, "episode") %> · <%= watch_time(show.watched_seconds) %></p>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+  <% end %>
+</div>

@@ -1,9 +1,12 @@
 <div class="px-6 py-8">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-3xl font-bold text-white">Watch History</h1>
-    <% if @entries.any? %>
-      <%= button_to "Clear History", clear_all_watch_history_index_path, method: :delete, class: "btn-secondary text-sm", data: { confirm: "Clear all watch history?" } %>
-    <% end %>
+    <div class="flex items-center gap-3">
+      <%= link_to "Your stats", stats_path, class: "btn-secondary text-sm" %>
+      <% if @entries.any? %>
+        <%= button_to "Clear History", clear_all_watch_history_index_path, method: :delete, class: "btn-secondary text-sm", data: { confirm: "Clear all watch history?" } %>
+      <% end %>
+    </div>
   </div>
 
   <% if @entries.any? %>
