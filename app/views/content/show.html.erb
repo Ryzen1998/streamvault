@@ -113,7 +113,11 @@
       <% if @streams_error.present? %>
         <div class="mt-8 p-4 bg-sv-surface rounded-lg border border-sv-border text-center">
           <p class="text-sv-warning"><%= @streams_error %></p>
-          <p class="text-sv-text-muted mt-1 text-sm">If this persists, the stream provider may be blocking this server's IP. Consider setting <code>TORRENTIO_PROXY</code> or <code>TORRENTIO_API_BASE_URL</code> env vars.</p>
+          <% if debrid_configured? %>
+            <p class="text-sv-text-muted mt-1 text-sm">If this persists, the stream provider may be blocking this server's IP. Consider setting <code>TORRENTIO_PROXY</code> or <code>TORRENTIO_API_BASE_URL</code> env vars.</p>
+          <% elsif admin_user? %>
+            <p class="text-sv-text-muted mt-1 text-sm">Streams come from the installed addons. If this persists, check that they're reachable under <%= link_to "Admin → Addons", admin_addons_path, class: "text-sv-accent" %>.</p>
+          <% end %>
         </div>
       <% elsif @streams.present? %>
         <h2 class="text-xl font-bold text-white mt-8 mb-4">Available Streams</h2>

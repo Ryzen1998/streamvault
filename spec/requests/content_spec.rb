@@ -72,6 +72,20 @@ RSpec.describe "Content", type: :request do
         expect(response.body).to include("Ask an admin to configure a debrid service")
       end
 
+      it "points admins at the addons, not Torrentio, when only addons serve streams" do
+        user.update!(admin: true)
+        create(:addon, url: "https://addon.example.com/manifest.json")
+        stub_request(:get, "https://v3-cinemeta.strem.io/meta/movie/tt1375666.json")
+          .to_return(status: 200, body: { "meta" => { "id" => "tt1375666", "name" => "Inception" } }.to_json,
+            headers: { "Content-Type" => "application/json" })
+        stub_request(:get, %r{addon\.example\.com/}).to_return(status: 503)
+
+        get content_path(type: "movie", imdb_id: "tt1375666")
+
+        expect(response.body).to include("Admin → Addons")
+        expect(response.body).not_to include("TORRENTIO_PROXY")
+      end
+
       it "rejects an invalid imdb_id format (SEC-09)" do
         get content_path(type: "movie", imdb_id: "not_an_imdb_id")
         expect(response).to redirect_to(root_path)
