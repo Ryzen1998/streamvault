@@ -1,0 +1,55 @@
+<div class="px-6 py-8 max-w-4xl">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-white">Users</h1>
+      <p class="text-sm text-sv-text-muted mt-1">Accounts on this instance and what each one has watched.</p>
+    </div>
+    <%= link_to "Add user", new_admin_user_path, class: "btn-primary text-sm" %>
+  </div>
+
+  <% if @issued_password %>
+    <div class="bg-sv-surface rounded-xl p-5 border border-sv-accent/40 mb-6">
+      <p class="text-sm text-white">Password for <span class="font-medium"><%= @issued_password["email"] %></span></p>
+      <p class="mt-2"><code class="text-base text-sv-accent select-all"><%= @issued_password["password"] %></code></p>
+      <p class="text-xs text-sv-text-muted mt-2">Shown only once. Share it privately; they can change it under Settings.</p>
+    </div>
+  <% end %>
+
+  <div class="space-y-3">
+    <% @users.each do |user| %>
+      <% summary = @summaries.fetch(user.id, Playback::AccountSummaries::EMPTY) %>
+      <div class="bg-sv-surface rounded-xl p-5 border border-sv-border">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-white font-medium truncate"><%= user.display_name.presence || user.email %></span>
+              <% if user.admin? %><span class="badge badge-accent shrink-0">Admin</span><% end %>
+              <% if user.disabled? %><span class="badge badge-warning shrink-0">Disabled</span><% end %>
+              <% if user == current_user %><span class="text-xs text-sv-text-muted">(you)</span><% end %>
+            </div>
+            <% if user.display_name.present? %>
+              <p class="text-xs text-sv-text-muted mt-0.5 truncate"><%= user.email %></p>
+            <% end %>
+            <p class="text-xs text-sv-text-muted mt-2">
+              <%= watch_time(summary.watched_seconds) %> watched
+              · <%= pluralize(summary.finished_count, "title") %> finished
+              · <%= summary.last_watched_at ? "last watched #{time_ago_in_words(summary.last_watched_at)} ago" : "nothing watched yet" %>
+              · joined <%= user.created_at.to_date.to_fs(:long) %>
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <%= link_to "Edit", edit_admin_user_path(user), class: "btn-secondary text-xs" %>
+            <%= button_to "Reset password", reset_password_admin_user_path(user), class: "btn-secondary text-xs" %>
+            <% unless user == current_user %>
+              <%= button_to "Remove", admin_user_path(user), method: :delete, class: "btn-secondary text-xs" %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="mt-8">
+    <%= link_to "← Back to settings", settings_path, class: "text-sm text-sv-accent hover:underline" %>
+  </div>
+</div>

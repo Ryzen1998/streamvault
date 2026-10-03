@@ -59,6 +59,12 @@ Rails.application.routes.draw do
 
   # Admin — debrid account and addon management (admin users only)
   namespace :admin do
+    resources :users, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        post :reset_password
+      end
+    end
+
     resource :debrid, only: [ :show, :update, :destroy ], controller: "debrid"
 
     resources :addons, only: [ :index, :new, :create, :edit, :update, :destroy ] do

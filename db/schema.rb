@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_03_120100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_03_140000) do
   create_table "addons", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
@@ -218,6 +218,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120100) do
     t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.string "default_language"
+    t.datetime "disabled_at"
     t.string "display_name"
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false

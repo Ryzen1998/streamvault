@@ -28,6 +28,20 @@ class User < ApplicationRecord
 
   validates :display_name, length: { maximum: 50 }
 
+  def disabled?
+    disabled_at.present?
+  end
+
+  # Devise checks this on sign-in and on every request, so disabling an
+  # account also ends its existing sessions.
+  def active_for_authentication?
+    super && !disabled?
+  end
+
+  def inactive_message
+    disabled? ? :disabled : super
+  end
+
   def preferred_stream_languages
     Array(preferred_languages).presence || [ "ENG" ]
   end

@@ -78,15 +78,21 @@
 
   <% if admin_user? %>
     <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
-      <h2 class="text-lg font-semibold text-white mb-2">Debrid service</h2>
-      <p class="text-xs text-sv-text-muted mb-4">The TorBox or RealDebrid account every user streams through.</p>
-      <%= link_to "Manage debrid service", admin_debrid_path, class: "btn-secondary text-sm" %>
-    </div>
-
-    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
-      <h2 class="text-lg font-semibold text-white mb-2">Addons</h2>
-      <p class="text-xs text-sv-text-muted mb-4">Manage the Stremio addons that provide streams, catalogs, and metadata.</p>
-      <%= link_to "Manage addons", admin_addons_path, class: "btn-secondary text-sm" %>
+      <h2 class="text-lg font-semibold text-white mb-4">Administration</h2>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">Accounts, admin access and what each account has watched.</p>
+          <%= link_to "Manage users", admin_users_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">The TorBox or RealDebrid account every user streams through.</p>
+          <%= link_to "Manage debrid service", admin_debrid_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">Stremio addons that provide streams, catalogs, metadata, search and subtitles.</p>
+          <%= link_to "Manage addons", admin_addons_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+      </div>
     </div>
   <% end %>
 </div>
