@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_03_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_03_170000) do
   create_table "addons", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
@@ -93,6 +93,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_160000) do
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.string "username"
+    t.json "watchlist_activities"
     t.index ["user_id"], name: "index_simkl_connections_on_user_id", unique: true
   end
 

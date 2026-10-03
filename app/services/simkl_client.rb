@@ -68,6 +68,27 @@ class SimklClient
     ServiceResult.failure("Could not reach Simkl (#{e.class.name.demodulize})")
   end
 
+  # Latest change timestamps per list. Simkl requires checking these before
+  # reading lists, and reading only what changed since the last import.
+  def activities
+    response = @connection.post("sync/activities")
+    response.success? && response.body.is_a?(Hash) ? ServiceResult.success(response.body) : failure(response)
+  rescue Faraday::Error => e
+    ServiceResult.failure("Could not reach Simkl (#{e.class.name.demodulize})")
+  end
+
+  # Plan-to-watch items of `type` ("movies" or "shows"); with `date_from`,
+  # only those changed since then. Simkl answers null for an empty list.
+  def plan_to_watch(type, date_from: nil)
+    params = date_from.present? ? { date_from: date_from } : {}
+    response = @connection.get("sync/all-items/#{type}/plantowatch", params)
+    return failure(response) unless response.success?
+
+    ServiceResult.success(response.body.is_a?(Hash) ? Array(response.body[type]) : [])
+  rescue Faraday::Error => e
+    ServiceResult.failure("Could not reach Simkl (#{e.class.name.demodulize})")
+  end
+
   # POST /sync/history: { movies: [...], shows: [...] }
   def add_to_history(movies: [], shows: [])
     response = @connection.post("sync/history", { movies: movies, shows: shows })

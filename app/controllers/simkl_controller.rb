@@ -52,6 +52,18 @@ class SimklController < ApplicationController
     redirect_to settings_path, notice: "Sending your finished titles to Simkl."
   end
 
+  def import_watchlist
+    connection = current_user.simkl_connection
+    return redirect_to settings_path, alert: "Link Simkl first." unless connection
+
+    result = Simkl::WatchlistImport.new(connection).call
+    if result.success?
+      redirect_to settings_path, notice: "Added #{helpers.pluralize(result.data, "title")} from your Simkl Plan to Watch list to your Wishlist."
+    else
+      redirect_to settings_path, alert: "Couldn't import your Simkl watchlist: #{result.error_message}"
+    end
+  end
+
   def destroy
     current_user.simkl_connection&.destroy
     session.delete(:simkl_pin)

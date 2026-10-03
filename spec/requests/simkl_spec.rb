@@ -78,6 +78,18 @@ RSpec.describe "Simkl", type: :request do
     expect(user.reload.simkl_connection).to be_nil
   end
 
+  it "imports the Simkl watchlist into the Wishlist" do
+    create(:simkl_connection, user: user)
+    stub_simkl(:post, "sync/activities", { movies: { plantowatch: "2026-10-01T10:00:00Z" }, tv_shows: { plantowatch: nil } })
+    stub_simkl(:get, "sync/all-items/movies/plantowatch",
+      { movies: [ { movie: { title: "Dune: Part Two", year: 2024, ids: { imdb: "tt15239678" } } } ] })
+
+    post import_watchlist_simkl_path
+
+    expect(flash[:notice]).to include("Added 1 title")
+    expect(user.collection_entries.wishlist.pluck(:imdb_id)).to eq([ "tt15239678" ])
+  end
+
   it "never shows the access token" do
     create(:simkl_connection, user: user, access_token: "SECRET_SIMKL_TOKEN")
 

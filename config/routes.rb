@@ -65,6 +65,7 @@ Rails.application.routes.draw do
     resource :simkl, only: [ :show, :create, :destroy ], controller: "simkl" do
       get :status
       post :sync
+      post :import_watchlist
     end
   end
 

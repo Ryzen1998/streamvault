@@ -116,7 +116,7 @@ StreamVault relies on several external services. Here's what each one does and h
 | **OMDB** | Enriches content with IMDb, Rotten Tomatoes, and Metacritic ratings | Yes | Get a free API key at [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx) |
 | **TMDB** | Powers the "Recommended for You" feature using your watch history | Optional | Create an account at [themoviedb.org](https://www.themoviedb.org), then get a Read Access Token at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
 | **SubDL** | Provides external subtitles when embedded ones aren't available | Optional | Get a free API key at [subdl.com/panel/api](https://subdl.com/panel/api) |
-| **Simkl** | Per-account watch tracking: finished movies and episodes go to each user's own Simkl history | Optional | Create an app at [simkl.com/settings/developer/new](https://simkl.com/settings/developer/new/) and set `SIMKL_CLIENT_ID`. Users link their own account under **Settings → Simkl** |
+| **Simkl** | Per-account watch tracking: finished movies and episodes go to each user's own Simkl history, and users can import their Plan to Watch list into their Wishlist | Optional | Create an app at [simkl.com/settings/developer/new](https://simkl.com/settings/developer/new/) and set `SIMKL_CLIENT_ID`. Users link their own account under **Settings → Simkl** |
 
 ### How the services work together
 
