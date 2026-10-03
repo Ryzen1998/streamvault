@@ -7,8 +7,7 @@ class SearchController < ApplicationController
     @query = params[:q]
 
     if @query.present?
-      catalog = Catalog::CinemetaClient.new
-      result = catalog.search(@query)
+      result = Catalog::Resolver.new.search(@query)
       all_results = result.success? ? result.data : []
       @error = result.failure? ? result.error_message : nil
 

@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe Streams::Resolver do
-  let(:user) { create(:user, realdebrid_api_key: "test_key_123") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key_123") }
   let(:available_streams) { instance_double(AvailableStreamsService) }
   let(:content_ref) { ContentRef.new(imdb_id: "tt1375666", type: "movie") }
   subject(:resolver) { described_class.new(user, available_streams: available_streams) }
@@ -14,13 +15,58 @@ RSpec.describe Streams::Resolver do
     ENV["STREAM_PROVIDER"] = previous
   end
 
-  it "fails before provider fan-out when the RealDebrid key is missing" do
-    user.update!(realdebrid_api_key: nil)
+  it "fails before provider fan-out when no debrid account is configured" do
+    debrid_account.destroy!
     expect(available_streams).not_to receive(:call)
 
     result = resolver.start(content_ref)
     expect(result).to be_failure
-    expect(result.error_message).to include("RealDebrid API key")
+    expect(result.error_message).to include("Ask an admin")
+  end
+
+  describe "with TorBox" do
+    let!(:debrid_account) { create(:debrid_account, :torbox, api_key: "tb_key") }
+    let(:requestdl_url) do
+      "https://api.torbox.app/v1/api/torrents/requestdl?token=tb_key&torrent_id=7&file_id=3&redirect=true"
+    end
+    let(:candidate) do
+      StreamCandidate.new(
+        title: "Inception 1080p",
+        filename: "Inception.mkv",
+        resolve_url: "https://torrentio.strem.fun/resolve/torbox/tb_key/abc/Inception.mkv/0/Inception.mkv"
+      )
+    end
+
+    before do
+      allow(available_streams).to receive(:call).and_return(ServiceResult.success([ candidate ]))
+      stub_request(:get, candidate.resolve_url)
+        .to_return(status: 302, headers: { "Location" => requestdl_url })
+    end
+
+    it "follows the requestdl redirect so the source is the CDN, not the keyed API URL" do
+      stub_request(:get, requestdl_url)
+        .to_return(status: 307, headers: { "Location" => "https://store-031.weur.tb-cdn.st/dld/abc-123" })
+
+      result = resolver.start(content_ref)
+
+      expect(result).to be_success
+      expect(result.data[:source].url).to eq("https://store-031.weur.tb-cdn.st/dld/abc-123")
+      expect(result.data[:source].request_headers).to eq({})
+    end
+
+    it "rejects the stream when requestdl does not redirect" do
+      stub_request(:get, requestdl_url)
+        .to_return(status: 400, body: { success: false, error: "BAD_TOKEN" }.to_json)
+
+      expect(resolver.start(content_ref)).to be_failure
+    end
+
+    it "skips Torrentio's limits-exceeded placeholder" do
+      stub_request(:get, candidate.resolve_url)
+        .to_return(status: 302, headers: { "Location" => "https://torrentio.strem.fun/videos/limits_exceeded_v2.mp4" })
+
+      expect(resolver.start(content_ref)).to be_failure
+    end
   end
 
   it "returns a clear failure when no candidates are available" do
@@ -138,5 +184,46 @@ RSpec.describe Streams::Resolver do
 
     expect(resolver.start(content_ref)).to be_failure
     expect(WebMock).not_to have_requested(:get, candidate.resolve_url)
+  end
+
+  it "accepts any public host when open trust is enabled" do
+    ENV["STREAM_SOURCE_TRUST"] = "any"
+    candidate = StreamCandidate.new(
+      title: "StremThru stream",
+      resolve_url: "https://stremthru.example.xyz/stremio/torz/abc",
+      provider: "Streams::StremioAddonProvider[Bodhi's AIO]"
+    )
+    allow(available_streams).to receive(:call).and_return(ServiceResult.success([ candidate ]))
+    allow(ResolvedSource).to receive(:public_url?).and_return(true)
+    stub_request(:get, candidate.resolve_url)
+      .to_return(status: 302, headers: { "Location" => "https://nexus-1.tb-cdn.pw/dld/abc" })
+
+    result = resolver.start(content_ref)
+
+    expect(result).to be_success
+    expect(result.data[:source].url).to eq("https://nexus-1.tb-cdn.pw/dld/abc")
+  ensure
+    ENV.delete("STREAM_SOURCE_TRUST")
+  end
+
+  it "sends addon request headers when probing and carries them onto the source" do
+    ENV["STREAM_SOURCE_TRUST"] = "any"
+    candidate = StreamCandidate.new(
+      resolve_url: "https://stremthru.example.xyz/stremio/torz/abc",
+      provider: "Streams::StremioAddonProvider[Bodhi's AIO]",
+      request_headers: { "User-Agent" => "Stremio" }
+    )
+    allow(available_streams).to receive(:call).and_return(ServiceResult.success([ candidate ]))
+    allow(ResolvedSource).to receive(:public_url?).and_return(true)
+    stub_request(:get, candidate.resolve_url)
+      .with(headers: { "User-Agent" => "Stremio" })
+      .to_return(status: 302, headers: { "Location" => "https://nexus-1.tb-cdn.pw/dld/abc" })
+
+    result = resolver.start(content_ref)
+
+    expect(result).to be_success
+    expect(result.data[:source].upstream_headers).to eq("User-Agent" => "Stremio")
+  ensure
+    ENV.delete("STREAM_SOURCE_TRUST")
   end
 end

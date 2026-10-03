@@ -10,12 +10,12 @@ class ContentController < ApplicationController
 
     return if reject_invalid_imdb_id!(@imdb_id) || reject_invalid_content_type!(@type)
 
-    catalog = Catalog::CinemetaClient.new
+    catalog = Catalog::Resolver.new
 
     meta_result = catalog.metadata(@imdb_id, @type)
     @metadata = meta_result.success? ? meta_result.data : nil
 
-    if @type != "show"
+    if @type != "show" && streaming_source_available?
       content_title = @metadata&.dig(:title)
       streams_result = AvailableStreamsService.new(current_user).call(
         imdb_id: @imdb_id,
@@ -61,7 +61,13 @@ class ContentController < ApplicationController
 
     return if reject_invalid_imdb_id!(@imdb_id) || reject_invalid_content_type!(@type)
 
-    catalog = Catalog::CinemetaClient.new
+    unless streaming_source_available?
+      @streams = []
+      @streams_error = Streams::Resolver::NO_SOURCE_MESSAGE
+      return render layout: false
+    end
+
+    catalog = Catalog::Resolver.new
 
     meta = catalog.metadata(@imdb_id, @type)
     @show_title = meta.success? ? meta.data[:title] : @imdb_id

@@ -8,6 +8,7 @@ RSpec.describe ExternalSubtitleService do
 
   after do
     described_class.subdl_provider = nil
+    described_class.addon_provider = nil
     Rails.cache = @original_cache
   end
 
@@ -65,6 +66,40 @@ RSpec.describe ExternalSubtitleService do
       result = described_class.extract_subtitles("external:subdl:not-base64-^", start_seconds: 0)
 
       expect(result.status).to eq(:invalid_stream)
+    end
+
+    it "extracts subtitles from addon tracks through the addon provider" do
+      provider = instance_double(Addons::SubtitleSource)
+      allow(provider).to receive(:download).with("signed-token").and_return(
+        ServiceResult.success("WEBVTT\n\n00:00:31.000 --> 00:00:33.000\nFrom an addon\n")
+      )
+      described_class.addon_provider = provider
+
+      result = described_class.extract_subtitles(described_class.stream_id("addon", "signed-token"), start_seconds: 30, duration_seconds: 10)
+
+      expect(result.status).to eq(:ok)
+      expect(result.vtt).to include("From an addon")
+      expect(result.source).to eq("addon")
+    end
+
+    it "rejects unknown providers" do
+      result = described_class.extract_subtitles(described_class.stream_id("other", "x"), start_seconds: 0)
+
+      expect(result.status).to eq(:unsupported_track)
+    end
+  end
+
+  describe ".search" do
+    it "combines SubDL and addon tracks" do
+      subdl = instance_double(SubdlSubtitleProvider, search: [ { index: "external:subdl:a", source: "subdl" } ])
+      addon = instance_double(Addons::SubtitleSource, search: [ { index: "external:addon:b", source: "addon" } ])
+      described_class.subdl_provider = subdl
+      described_class.addon_provider = addon
+
+      tracks = described_class.search(imdb_id: "tt1375666", type: "movie", preferred_languages: [ "ENG" ])
+
+      expect(tracks.map { |track| track[:source] }).to contain_exactly("subdl", "addon")
+      expect(addon).to have_received(:search).with(hash_including(imdb_id: "tt1375666", type: "movie"))
     end
   end
 end

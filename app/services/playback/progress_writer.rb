@@ -20,6 +20,7 @@ module Playback
         season_number: content_ref.season || 0,
         episode_number: content_ref.episode || 0
       ) { is_new = true }
+      finished_before = !is_new && PlaybackCompletionPolicy.finished?(entry)
       entry.assign_attributes(
         title: title.presence || stored_title(content_ref) || "Unknown",
         poster_url: poster_url.presence || stored_poster(content_ref),
@@ -29,6 +30,7 @@ module Playback
       )
       entry.save!
       RefreshRecommendationsJob.enqueue_debounced(@user.id) if is_new
+      sync_to_simkl(entry) if !finished_before && PlaybackCompletionPolicy.finished?(entry)
       ServiceResult.success(entry)
     rescue ActiveRecord::RecordInvalid => e
       ServiceResult.failure(e.message)
@@ -38,6 +40,13 @@ module Playback
     end
 
     private
+
+    # Runs once per title, when it first crosses the finished threshold.
+    def sync_to_simkl(entry)
+      return if entry.simkl_synced_at || !SimklClient.configured? || !@user.simkl_connection
+
+      SimklHistorySyncJob.perform_later(@user.id)
+    end
 
     def collection_entry(content_ref)
       @user.collection_entries.find_by(imdb_id: content_ref.imdb_id)

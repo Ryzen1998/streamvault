@@ -6,8 +6,11 @@ module Streams
     REQUEST_TIMEOUT = 30
     OPEN_TIMEOUT = 5
 
-    def initialize(rd_api_key: nil, connection: nil, parser: ReleaseParser.new, logger: Rails.logger)
-      @rd_api_key = rd_api_key
+    # Torrentio's cached-stream marker: "[RD+] Torrentio", "[TB+] Torrentio".
+    CACHED_MARKER = /\[[A-Za-z]+\+\]/
+
+    def initialize(debrid: nil, connection: nil, parser: ReleaseParser.new, logger: Rails.logger)
+      @debrid = debrid
       @parser = parser
       @logger = logger
       @connection = connection || Faraday.new(url: BASE_URL) do |faraday|
@@ -44,20 +47,31 @@ module Streams
     rescue Faraday::ConnectionFailed
       ServiceResult.failure("Could not connect to stream service")
     rescue StandardError => e
-      @logger.error("[Streams::TorrentioProvider] #{e.class}: #{e.message}")
+      @logger.error("[Streams::TorrentioProvider] #{e.class}: #{redacted(e.message)}")
       ServiceResult.failure("An unexpected error occurred")
     end
 
     private
 
     def stream_path(imdb_id, type, season:, episode:)
-      prefix = @rd_api_key.present? ? "/realdebrid=#{@rd_api_key}" : ""
+      prefix = @debrid ? "/#{debrid_options}" : ""
       content = if type.to_s.in?(%w[show series]) && season && episode
         "series/#{imdb_id}:#{season}:#{episode}"
       else
         "movie/#{imdb_id}"
       end
       "#{prefix}/stream/#{content}.json"
+    end
+
+    # Torrentio config segment, e.g. "torbox=<key>". TorBox reports exactly what
+    # is cached, so its "download" links only queue torrents on the shared
+    # account and are hidden; RealDebrid's cache data is approximate, so its
+    # download links stay listed. Options are "|"-separated, which must be
+    # percent-encoded to form a valid request URI.
+    def debrid_options
+      options = [ "#{@debrid.service}=#{@debrid.api_key}" ]
+      options << "debridoptions=nodownloadlinks" if @debrid.torbox?
+      options.join("%7C")
     end
 
     def parse(stream)
@@ -69,7 +83,7 @@ module Streams
         title: stream["title"], info_hash: stream["infoHash"], file_idx: stream["fileIdx"],
         name: stream["name"], quality: attributes[:quality], seeders: seeders(stream),
         size: @parser.format_size(size), raw_size: size,
-        rd_plus: stream["sources"].is_a?(Array) && stream["sources"].any?,
+        cached: stream["name"].to_s.match?(CACHED_MARKER),
         filename: filename, resolve_url: rewritten_resolve_url(stream["url"]),
         languages: attributes[:languages], video_codec: attributes[:video_codec],
         audio_codec: attributes[:audio_codec], container: attributes[:container],
@@ -88,7 +102,7 @@ module Streams
     end
 
     def redacted(path)
-      @rd_api_key.present? ? path.to_s.gsub(@rd_api_key, "[REDACTED]") : path
+      @debrid ? @debrid.redact(path) : path
     end
   end
 end

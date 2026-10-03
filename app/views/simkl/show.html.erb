@@ -1,0 +1,21 @@
+<div class="px-6 py-8 max-w-xl">
+  <h1 class="text-3xl font-bold text-white mb-2">Link Simkl</h1>
+  <p class="text-sm text-sv-text-muted mb-8">Approve StreamVault on Simkl and this page finishes on its own.</p>
+
+  <div class="bg-sv-surface rounded-xl p-6 border border-sv-border text-center"
+       data-controller="simkl-pin"
+       data-simkl-pin-status-url-value="<%= status_simkl_path(format: :json) %>"
+       data-simkl-pin-done-url-value="<%= settings_path %>"
+       data-simkl-pin-interval-value="<%= @pin["interval"] %>">
+    <p class="text-sm text-sv-text">
+      Go to <a href="<%= @pin["verification_url"] %>" target="_blank" rel="noopener" class="text-sv-accent font-medium"><%= @pin["verification_url"].to_s.sub(%r{\Ahttps?://}, "").delete_suffix("/") %></a> and enter this code:
+    </p>
+    <p class="mt-4 text-4xl font-semibold tracking-[0.3em] text-white select-all"><%= @pin["user_code"] %></p>
+    <p class="mt-4 text-xs text-sv-text-muted" data-simkl-pin-target="message" role="status">Waiting for you to approve StreamVault on Simkl…</p>
+  </div>
+
+  <div class="flex items-center gap-3 mt-6">
+    <%= button_to "Check now", status_simkl_path, method: :get, class: "btn-secondary text-sm" %>
+    <%= link_to "Cancel", settings_path, class: "text-sm text-sv-text-muted hover:text-white" %>
+  </div>
+</div>

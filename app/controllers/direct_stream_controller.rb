@@ -9,7 +9,7 @@ class DirectStreamController < ApplicationController
   MAX_REDIRECTS = 5
 
   # GET /direct_stream?source=... — transparent HTTP proxy for direct play.
-  # Forwards the protected RealDebrid source with auth headers and Range
+  # Forwards the protected debrid source with auth headers and Range
   # passthrough, so the browser's <video> element downloads at network speed
   # and seeks via Range requests — no ffmpeg involved.
   def show

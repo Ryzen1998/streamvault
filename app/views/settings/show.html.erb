@@ -40,23 +40,6 @@
     </div>
 
     <div class="bg-sv-surface rounded-xl p-6 border border-sv-border">
-      <h2 class="text-lg font-semibold text-white mb-4">RealDebrid</h2>
-
-      <div class="mb-4">
-        <%= f.label :realdebrid_api_key, "API Key", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
-        <%= f.password_field :realdebrid_api_key, class: "input-field", placeholder: "Enter your RealDebrid API key", value: "" %>
-        <p class="text-xs text-sv-text-muted mt-1">Get your API key from <a href="https://real-debrid.com/apitoken" target="_blank" class="text-sv-accent">real-debrid.com/apitoken</a></p>
-      </div>
-
-      <% if @user.has_realdebrid_key? %>
-        <div class="flex items-center gap-2 text-sv-success text-sm">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          API key configured
-        </div>
-      <% end %>
-    </div>
-
-    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border">
       <h2 class="text-lg font-semibold text-white mb-2">Preferred Languages</h2>
       <p class="text-xs text-sv-text-muted mb-4">Select at least one language. Streams without at least one of your selected languages will be filtered out.</p>
 
@@ -91,5 +74,53 @@
     </div>
 
     <%= f.submit "Save Settings", class: "btn-primary cursor-pointer" %>
+  <% end %>
+
+  <% if SimklClient.configured? %>
+    <% simkl = @user.simkl_connection %>
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
+      <h2 class="text-lg font-semibold text-white mb-2">Simkl</h2>
+      <p class="text-xs text-sv-text-muted mb-4">
+        Track what you watch on your <a href="https://simkl.com" target="_blank" rel="noopener" class="text-sv-accent">Simkl</a> profile.
+        Movies and episodes you finish here are added to your Simkl history, including ones you finished before linking.
+      </p>
+      <% if simkl %>
+        <p class="text-sm text-sv-text">Linked as <span class="font-medium text-white"><%= simkl.username.presence || "your Simkl account" %></span></p>
+        <% if simkl.last_error.present? %>
+          <p class="text-xs text-sv-warning mt-1">Last sync failed: <%= simkl.last_error %></p>
+        <% elsif simkl.last_synced_at %>
+          <p class="text-xs text-sv-text-muted mt-1">Last synced <%= time_ago_in_words(simkl.last_synced_at) %> ago.</p>
+        <% end %>
+        <div class="flex flex-wrap items-center gap-3 mt-4">
+          <%= button_to "Sync now", sync_simkl_path, class: "btn-secondary text-sm" %>
+          <%= button_to "Import watchlist", import_watchlist_simkl_path, class: "btn-secondary text-sm",
+                title: "Add your Simkl Plan to Watch list to your Wishlist" %>
+          <%= button_to "Unlink", simkl_path, method: :delete, class: "btn-secondary text-sm" %>
+        </div>
+        <p class="text-xs text-sv-text-muted mt-2">Import watchlist adds your Simkl Plan to Watch titles to your Wishlist.</p>
+      <% else %>
+        <%= button_to "Link Simkl", simkl_path, class: "btn-primary text-sm" %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if admin_user? %>
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
+      <h2 class="text-lg font-semibold text-white mb-4">Administration</h2>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">Accounts, admin access and what each account has watched.</p>
+          <%= link_to "Manage users", admin_users_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">The TorBox or RealDebrid account every user streams through.</p>
+          <%= link_to "Manage debrid service", admin_debrid_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <p class="text-xs text-sv-text-muted">Stremio addons that provide streams, catalogs, metadata, search and subtitles.</p>
+          <%= link_to "Manage addons", admin_addons_path, class: "btn-secondary text-sm shrink-0" %>
+        </div>
+      </div>
+    </div>
   <% end %>
 </div>

@@ -2,9 +2,9 @@
 
 class StreamCandidate
   ATTRIBUTES = %i[
-    title info_hash file_idx name quality seeders size raw_size rd_plus filename
+    title info_hash file_idx name quality seeders size raw_size cached filename
     resolve_url languages video_codec audio_codec container compatibility_score
-    language_score provider
+    language_score provider request_headers
   ].freeze
 
   attr_reader(*ATTRIBUTES)
@@ -18,7 +18,15 @@ class StreamCandidate
     @language_score = @language_score.to_i
     @compatibility_score = @compatibility_score.to_i
     @raw_size = @raw_size.to_i
+    # Addon-provided request headers (Stremio `behaviorHints.proxyHeaders`).
+    @request_headers = self.class.normalize_headers(@request_headers)
     freeze
+  end
+
+  def self.normalize_headers(value)
+    return {} unless value.is_a?(Hash)
+
+    value.each_with_object({}) { |(key, val), out| out[key.to_s] = val.to_s }.freeze
   end
 
   def self.from(value, provider: nil)

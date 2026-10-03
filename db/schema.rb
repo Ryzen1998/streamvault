@@ -10,7 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_03_170000) do
+  create_table "addons", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_checked_at"
+    t.text "last_error"
+    t.string "manifest_id"
+    t.json "manifest_types"
+    t.string "name"
+    t.integer "position", default: 0, null: false
+    t.boolean "trust_source_hosts", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["enabled"], name: "index_addons_on_enabled"
+    t.index ["url"], name: "index_addons_on_url", unique: true
+  end
+
   create_table "collection_entries", force: :cascade do |t|
     t.integer "content_type", default: 0, null: false
     t.datetime "created_at", null: false
@@ -25,6 +41,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
     t.index ["user_id", "imdb_id"], name: "idx_collection_entries_unique", unique: true
     t.index ["user_id", "list_state"], name: "idx_collection_entries_state"
     t.index ["user_id"], name: "index_collection_entries_on_user_id"
+  end
+
+  create_table "debrid_accounts", force: :cascade do |t|
+    t.text "api_key", null: false
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.text "last_error"
+    t.string "plan"
+    t.string "service", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "verified_at"
   end
 
   create_table "hls_sessions", force: :cascade do |t|
@@ -47,6 +74,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
     t.string "poster_url"
     t.integer "progress_seconds", default: 0, null: false
     t.integer "season_number", default: 0, null: false
+    t.datetime "simkl_synced_at"
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
@@ -55,6 +83,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
     t.index ["user_id", "imdb_id"], name: "idx_playback_progresses_content"
     t.index ["user_id"], name: "index_playback_progresses_on_user_id"
     t.index ["watched_at"], name: "index_playback_progresses_on_watched_at"
+  end
+
+  create_table "simkl_connections", force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "created_at", null: false
+    t.text "last_error"
+    t.datetime "last_synced_at"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.string "username"
+    t.json "watchlist_activities"
+    t.index ["user_id"], name: "index_simkl_connections_on_user_id", unique: true
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
@@ -190,13 +230,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
   end
 
   create_table "users", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.string "default_language"
+    t.datetime "disabled_at"
     t.string "display_name"
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
     t.text "preferred_languages"
-    t.text "realdebrid_api_key"
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
@@ -208,6 +249,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
   add_foreign_key "collection_entries", "users"
   add_foreign_key "hls_sessions", "users"
   add_foreign_key "playback_progresses", "users"
+  add_foreign_key "simkl_connections", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

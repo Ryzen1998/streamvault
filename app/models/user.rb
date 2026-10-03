@@ -4,13 +4,11 @@ class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable
 
-  # Encryption
-  encrypts :realdebrid_api_key, deterministic: false
-
   # Associations
   has_many :collection_entries, dependent: :destroy
   has_many :playback_progresses, dependent: :destroy
   has_many :hls_sessions, dependent: :destroy
+  has_one :simkl_connection, dependent: :destroy
 
   # Language preferences
   serialize :preferred_languages, coder: JSON
@@ -31,8 +29,18 @@ class User < ApplicationRecord
 
   validates :display_name, length: { maximum: 50 }
 
-  def has_realdebrid_key?
-    realdebrid_api_key.present?
+  def disabled?
+    disabled_at.present?
+  end
+
+  # Devise checks this on sign-in and on every request, so disabling an
+  # account also ends its existing sessions.
+  def active_for_authentication?
+    super && !disabled?
+  end
+
+  def inactive_message
+    disabled? ? :disabled : super
   end
 
   def preferred_stream_languages

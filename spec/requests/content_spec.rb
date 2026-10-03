@@ -36,6 +36,56 @@ RSpec.describe "Content", type: :request do
         expect(response.body).not_to include('data-controller="stream-loading"')
       end
 
+      it "lists streams without exposing the instance debrid key to the browser" do
+        create(:debrid_account, :torbox, api_key: "SECRET_TB_KEY")
+        resolve_url = "https://torrentio.strem.fun/resolve/torbox/SECRET_TB_KEY/abc/Inception.mkv/0/Inception.mkv"
+        stub_request(:get, "https://v3-cinemeta.strem.io/meta/movie/tt1375666.json")
+          .to_return(
+            status: 200,
+            body: { "meta" => { "id" => "tt1375666", "name" => "Inception" } }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+        stub_request(:get, %r{torrentio\.strem\.fun/torbox=SECRET_TB_KEY.*/stream/movie/tt1375666\.json})
+          .to_return(
+            status: 200,
+            body: { "streams" => [ { "name" => "[TB+] Torrentio\n1080p", "title" => "Inception 1080p", "url" => resolve_url,
+                                     "behaviorHints" => { "filename" => "Inception.mkv" } } ] }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        get content_path(type: "movie", imdb_id: "tt1375666")
+
+        expect(response.body).to include("Inception 1080p", "Cached", 'name="stream_token"')
+        expect(response.body).not_to include("SECRET_TB_KEY")
+        expect(response.body).not_to include("resolve_url")
+      end
+
+      it "tells users to ask an admin when streaming is not set up" do
+        stub_request(:get, "https://v3-cinemeta.strem.io/meta/movie/tt1375666.json")
+          .to_return(status: 200, body: { "meta" => { "id" => "tt1375666", "name" => "Inception" } }.to_json,
+            headers: { "Content-Type" => "application/json" })
+        stub_request(:get, %r{torrentio\.strem\.fun/([^/]+/)?stream/movie/tt1375666\.json})
+          .to_return(status: 200, body: { "streams" => [] }.to_json, headers: { "Content-Type" => "application/json" })
+
+        get content_path(type: "movie", imdb_id: "tt1375666")
+
+        expect(response.body).to include("Ask an admin to configure a debrid service")
+      end
+
+      it "points admins at the addons, not Torrentio, when only addons serve streams" do
+        user.update!(admin: true)
+        create(:addon, url: "https://addon.example.com/manifest.json")
+        stub_request(:get, "https://v3-cinemeta.strem.io/meta/movie/tt1375666.json")
+          .to_return(status: 200, body: { "meta" => { "id" => "tt1375666", "name" => "Inception" } }.to_json,
+            headers: { "Content-Type" => "application/json" })
+        stub_request(:get, %r{addon\.example\.com/}).to_return(status: 503)
+
+        get content_path(type: "movie", imdb_id: "tt1375666")
+
+        expect(response.body).to include("Admin → Addons")
+        expect(response.body).not_to include("TORRENTIO_PROXY")
+      end
+
       it "rejects an invalid imdb_id format (SEC-09)" do
         get content_path(type: "movie", imdb_id: "not_an_imdb_id")
         expect(response).to redirect_to(root_path)

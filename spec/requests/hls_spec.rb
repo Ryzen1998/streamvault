@@ -3,7 +3,8 @@
 require "rails_helper"
 
 RSpec.describe "HLS streaming", type: :request do
-  let(:user) { create(:user, realdebrid_api_key: "testkey") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "testkey") }
   let(:media_url) { "https://download.real-debrid.com/d/test.mp4" }
   let(:source_token) { signed_source_for(user, url: media_url, filename: "test.mp4") }
 

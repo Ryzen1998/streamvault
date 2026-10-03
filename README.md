@@ -18,7 +18,7 @@
 
 ## What is StreamVault?
 
-StreamVault is a self-hosted Rails application for discovering, organising, and watching media in a browser. It combines metadata and stream providers with your own RealDebrid account, then chooses the lightest playback path the browser can handle: direct play, video remuxing, or FFmpeg transcoding.
+StreamVault is a self-hosted Rails application for discovering, organising, and watching media in a browser. It combines metadata and stream providers with a TorBox or RealDebrid account set up by an admin, then chooses the lightest playback path the browser can handle: direct play, video remuxing, or FFmpeg transcoding.
 
 The player supports movies and episodic TV, multiple audio tracks, embedded and external subtitles, progress tracking, automatic recovery, and responsive desktop/mobile controls.
 
@@ -48,7 +48,7 @@ StreamVault (Rails app)
   │
   ├──► Torrentio / Comet  →  finds available streams
   │
-  ├──► RealDebrid         →  resolves the selected stream to a direct link
+  ├──► TorBox/RealDebrid  →  resolves the selected stream to a direct link
   │
   └──► Playback layer
        ├── Direct proxy   →  passes compatible media to the browser
@@ -58,7 +58,7 @@ StreamVault (Rails app)
 
 1. **Search** — Type a title. StreamVault queries metadata catalogues (Cinemeta) and returns matching content with posters, ratings, and plots.
 2. **Pick a stream** — Each title shows a list of available streams with quality (4K, 1080p, 720p), file size, and audio languages. Streams are sorted by your language preferences.
-3. **Press play** — StreamVault resolves the selected stream through RealDebrid and probes its tracks. Compatible media plays directly; other sources are remuxed or transcoded into browser-friendly H.264/AAC fragmented MP4 or HLS. Audio timestamps are normalised, and bitmap subtitles are burned in when necessary.
+3. **Press play** — StreamVault resolves the selected stream through the configured debrid service (TorBox or RealDebrid) and probes its tracks. Compatible media plays directly; other sources are remuxed or transcoded into browser-friendly H.264/AAC fragmented MP4 or HLS. Audio timestamps are normalised, and bitmap subtitles are burned in when necessary.
 4. **Watch** — The custom in-browser player handles playback with seeking, audio track switching, subtitles, and progress tracking. Close the tab and come back later — you'll resume right where you left off.
 
 ## Features
@@ -95,7 +95,7 @@ StreamVault (Rails app)
 ### Personalisation
 - **Language preferences** — Choose your preferred audio languages (16 supported). Streams are filtered and sorted to prioritise your languages.
 - **Default language** — Set which language is selected by default when starting a stream.
-- **Per-user configuration** — Each user has their own library, history, wishlist, and settings. API keys are encrypted at rest.
+- **Per-user configuration** — Each user has their own library, history, wishlist, and settings. The debrid key is instance-wide: admins manage it, users never see it, and it is encrypted at rest.
 
 ### Interface
 - **Dark theme** — Easy on the eyes, with an indigo-violet accent on dark neutral surfaces.
@@ -109,19 +109,20 @@ StreamVault relies on several external services. Here's what each one does and h
 
 | Service | Role | Required? | How to get access |
 |---------|------|-----------|-------------------|
-| **RealDebrid** | Resolves selected files and provides direct streaming links | **Yes** — streaming won't work without it | Sign up at [real-debrid.com](https://real-debrid.com), then get your API key at [real-debrid.com/apitoken](https://real-debrid.com/apitoken) |
+| **TorBox** or **RealDebrid** | Resolves selected files and provides direct streaming links | **Yes** — one of them; streaming won't work without it | TorBox: sign up at [torbox.app](https://torbox.app) and copy the API key from [torbox.app/settings](https://torbox.app/settings). RealDebrid: get it at [real-debrid.com/apitoken](https://real-debrid.com/apitoken). An admin enters it under **Admin → Debrid** |
 | **Torrentio** | Finds available streams for a given title | Yes (default provider) | Works out of the box with the public instance. May need a proxy if your server IP is blocked (see below) |
 | **Comet** | Alternative stream provider — self-hosted, independent of Torrentio | Optional (recommended) | Self-host via Docker — see [proxy/comet](proxy/comet) |
 | **Cinemeta** | Provides content metadata (titles, posters, plots, episodes) | Yes (built-in) | No setup needed — uses the public Stremio metadata service |
 | **OMDB** | Enriches content with IMDb, Rotten Tomatoes, and Metacritic ratings | Yes | Get a free API key at [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx) |
 | **TMDB** | Powers the "Recommended for You" feature using your watch history | Optional | Create an account at [themoviedb.org](https://www.themoviedb.org), then get a Read Access Token at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
 | **SubDL** | Provides external subtitles when embedded ones aren't available | Optional | Get a free API key at [subdl.com/panel/api](https://subdl.com/panel/api) |
+| **Simkl** | Per-account watch tracking: finished movies and episodes go to each user's own Simkl history, and users can import their Plan to Watch list into their Wishlist | Optional | Create an app at [simkl.com/settings/developer/new](https://simkl.com/settings/developer/new/) and set `SIMKL_CLIENT_ID`. Users link their own account under **Settings → Simkl** |
 
 ### How the services work together
 
 - **Torrentio and Comet** are both stream *providers*. They search torrent networks for available streams and return a list with quality, size, and language information. You can use either one or both — when both are configured (`STREAM_PROVIDER=auto`), StreamVault queries them in parallel and picks the best stream regardless of which provider found it. If one is down, the other fills in.
 
-- **RealDebrid** is the *resolver*. Once you pick a stream, StreamVault sends its magnet link to RealDebrid, which retrieves or resolves the selected file and returns a direct HTTPS link. StreamVault does not add the source file to a persistent local media library, but its bytes pass through the server on demand and may be buffered temporarily during proxying or transcoding.
+- **TorBox or RealDebrid** is the *resolver*. Torrentio and Comet are queried with the instance's debrid account; once you pick a stream, StreamVault follows the provider's resolve link (and, for TorBox, the API's download redirect) to a direct HTTPS link on the debrid CDN. StreamVault does not add the source file to a persistent local media library, but its bytes pass through the server on demand and may be buffered temporarily during proxying or transcoding.
 
 - **FFmpeg** is the *translator*. StreamVault bypasses it for sources the browser can play directly. Otherwise FFmpeg copies compatible video when safe, normalises audio to AAC with timestamp correction, or re-encodes incompatible/UHD video to browser-friendly 1080p H.264. It also produces HLS for iPhone playback and burns image-based subtitles that browsers cannot render.
 
@@ -150,7 +151,7 @@ The most demanding component is **FFmpeg transcoding**, which happens on-the-fly
 ### Prerequisites
 
 - A server or VPS with **Docker** and **Docker Compose** installed
-- A **RealDebrid subscription** (starts at ~€3/month)
+- A **TorBox** or **RealDebrid** subscription
 - API keys for **OMDB** (free) and optionally **TMDB** (free) and **SubDL** (free)
 
 ### Quick start
@@ -182,12 +183,12 @@ Assets are precompiled inside the image during build — no local Ruby or Node i
 
 ### Create your first user
 
-Sign-ups are disabled by default for security. Create your user via the Rails console:
+Sign-ups are disabled by default for security. Create your user via the Rails console (as an admin, so you can configure the debrid service):
 
 ```bash
 docker compose exec web bin/rails c
 > password = SecureRandom.base58(24)
-> User.create!(email: "you@example.com", password: password, password_confirmation: password)
+> User.create!(email: "you@example.com", password: password, password_confirmation: password, admin: true)
 > puts password
 ```
 
@@ -195,9 +196,13 @@ Store the generated password in your password manager, then sign in and change i
 
 To enable self-registration, set `ENABLE_SIGNUPS=true` in `.env` and restart.
 
-### Configure your RealDebrid key
+### Configure the debrid service
 
-After logging in, go to **Settings** and enter your RealDebrid API key. The app verifies the key automatically and shows a confirmation. Your key is encrypted at rest using Active Record Encryption — it never appears in logs or is transmitted in plain text.
+StreamVault streams every user through one debrid account. Signed in as an admin, open **Admin → Debrid** (also linked from **Settings**), pick **TorBox** or **RealDebrid**, and paste the API key. StreamVault verifies the key when you save. The key is encrypted at rest with Active Record Encryption; regular users can't see or change it, and it never reaches the browser — stream pickers post an encrypted token instead of the provider's key-bearing resolve URL.
+
+As a bootstrap alternative, set `DEBRID_SERVICE` (`torbox` or `realdebrid`) and `DEBRID_API_KEY` in `.env`. An account saved in the admin page takes precedence.
+
+With TorBox, StreamVault asks Torrentio for cached streams only, so playing never queues downloads on the shared account.
 
 ### Auto-start on boot
 
@@ -230,12 +235,19 @@ docker compose up -d --build
 | `POSTGRES_DB` | PostgreSQL database name | `streamvault` |
 | `PORT` | Host port to expose the app on | `3000` |
 | `STREAM_PROVIDER` | Which stream provider to use: `torrentio`, `comet`, or `auto` (see below) | `torrentio` |
+| `STREMIO_ADDONS` | Comma-separated Stremio addon manifest URLs (bootstrap fallback for the admin addon UI). When set, these become the only stream sources | Optional |
+| `STREAM_SOURCE_HOSTS` | Extra hosts allowed as stream sources (addon proxies / debrid CDNs such as StremThru or `tb-cdn.pw`); only needed when open trust is off | Optional |
+| `STREAM_SOURCE_TRUST` | Set to `any` to trust any HTTPS + public playback host returned by an installed addon (open trust) | Optional |
 | `TORRENTIO_API_BASE_URL` | Torrentio API base URL | `https://torrentio.strem.fun` |
 | `COMET_URL` | URL of your self-hosted Comet instance | Optional |
+| `DEBRID_SERVICE` | Bootstrap debrid service, `torbox` or `realdebrid`; the admin page takes precedence | Optional |
+| `DEBRID_API_KEY` | API key for `DEBRID_SERVICE` | Optional |
 | `REALDEBRID_API_BASE_URL` | RealDebrid API base URL | `https://api.real-debrid.com/rest/1.0` |
+| `TORBOX_API_BASE_URL` | TorBox API base URL (key verification) | `https://api.torbox.app/v1` |
 | `OMDB_API_KEY` | OMDB API key for ratings metadata | Required |
 | `TMDB_READ_ACCESS_TOKEN` | TMDB v4 bearer token for recommendations | Optional |
 | `SUBDL_API_KEY` | SubDL API key for external subtitle fallback | Optional |
+| `SIMKL_CLIENT_ID` | Simkl app client id; lets each account link Simkl and track what it watches | Optional |
 | `TORRENTIO_PROXY` | Forward proxy URL for Torrentio requests (if IP is blocked) | Optional |
 | `CINEMETA_PROXY` | Forward proxy URL for Cinemeta requests (if needed) | Optional |
 | `COMET_PROXY` | Forward proxy URL for Comet requests (if needed) | Optional |
@@ -335,6 +347,62 @@ If you run StreamVault on your home computer (which has a residential IP that Re
 | `comet` | Comet | Torrentio | Explicit Comet-first with Torrentio fallback |
 | `auto` | Comet (if `COMET_URL` set) | Torrentio | **Recommended** — best of both worlds |
 
+## Stremio addons
+
+StreamVault can consume [Stremio addons](https://stremio.github.io/stremio-addon-sdk/protocol.html)
+as stream, catalog, and metadata sources. When at least one addon is installed,
+it replaces the `STREAM_PROVIDER`-configured providers entirely. Home rows are
+built from each addon's declared `catalogs`, and detail pages prefer addon
+`meta`; both fall back to Cinemeta when an addon has nothing to offer, so the UI
+never breaks.
+
+**Search** — catalogs that declare a `search` extra are searched alongside
+Cinemeta. Addon results come first; titles without an IMDb id are skipped,
+since playback and tracking are keyed on IMDb ids.
+
+**Subtitles** — addons that serve the `subtitles` resource (for example
+OpenSubtitles v3) add tracks to the player next to embedded and SubDL ones,
+filtered to each account's languages. Subtitle URLs never reach the browser:
+tracks carry a signed id, and the server fetches only the URLs it listed, from
+public addresses only.
+
+**Managing addons** — an account with the admin role sees **Settings → Addons**.
+Paste an addon's `manifest.json` URL; StreamVault verifies it before saving.
+Addons may also be bootstrapped via the `STREMIO_ADDONS` environment variable
+(comma-separated), though the database (admin UI) is authoritative when populated.
+
+**Playback model** — the addon must return playable `url`s. Addons that resolve
+and proxy debrid links themselves (for example a self-hosted [AIOStreams](https://github.com/Viren070/AIOStreams)
+instance with its **built-in proxy enabled**) are the simplest setup: StreamVault
+only ever talks to the addon host, so your debrid credentials stay on the addon
+and no debrid key is needed in StreamVault.
+
+If your addon returns URLs on a different host — an external proxy such as
+**StremThru/MediaFlow**, or a debrid CDN such as TorBox's `tb-cdn.pw` — enable
+**open trust** for that addon with the *"Trust playback hosts returned by this
+addon"* checkbox (or set `STREAM_SOURCE_TRUST=any` globally). StreamVault then
+accepts any HTTPS host the addon returns; the public-address guard (no
+loopback/private/link-local) still applies. Prefer this over `STREAM_SOURCE_HOSTS`
+when the host varies per stream, since per-service proxies and CDNs are not known
+up front.
+
+> Trusted sources are the installed addons (see `Addons::Registry`). With open
+> trust off, StreamVault only accepts hosts it explicitly knows; with it on, it
+> accepts what a trusted addon returns, still guarded by the DNS check in
+> `ResolvedSource`.
+
+StreamVault honours `behaviorHints.proxyHeaders.request` from addon streams:
+required request headers are carried (signed, server-side) from the stream
+listing through to every playback fetcher — direct play, transcode, HLS, and
+subtitle extraction. Transport headers (`Host`, `Range`, …) are stripped, and
+the headers travel in the encrypted stream token issued with the listing rather than being accepted from the client.
+
+**Granting the admin role:**
+
+```ruby
+User.find_by(email: "you@example.com").update!(admin: true)
+```
+
 ## Testing
 
 Local development uses Ruby 4.0.5. PostgreSQL and FFmpeg must be available; the JavaScript regression suite uses Node's built-in test runner and needs no npm install.
@@ -377,17 +445,18 @@ app/
 |----------|------|
 | **Catalog::CinemetaClient / Catalog::OmdbClient** | Fetch canonical metadata, catalogs, and ratings |
 | **Streams::TorrentioProvider / CometService** | Fetch typed `StreamCandidate` values from configured providers |
-| **AvailableStreamsService / Streams::Resolver** | Cache candidates, rank them, resolve a playback-safe RealDebrid source |
+| **AvailableStreamsService / Streams::Resolver** | Cache candidates, rank them, resolve a playback-safe debrid source |
 | **PlaybackStartService / PlaybackResumeService** | Build signed `PlaybackDescriptor` values and choose resume targets |
 | **Playback::ProgressWriter / Playback::ContinueWatchingQuery** | Persist unified progress and build Continue Watching |
 | **Media::Probe / Media::Subtitles / Media::Transcoder** | Probe tracks, extract subtitles, and produce fMP4 or HLS output |
 | **HlsSessionManager** | Persist, monitor, expire, and clean up HLS processes |
 | **RecommendationService / TmdbService** | Cache personalized TMDB recommendations outside user media state |
-| **RealDebridService** | Verify user API keys |
+| **Debrid / DebridAccount** | The instance-wide TorBox or RealDebrid account (admin-managed, encrypted) |
+| **RealDebridService / TorboxService** | Verify the admin's debrid key |
 
 ### Authorisation
 
-Every user-owned query is scoped through `current_user` associations. Playback and media URLs use signed, expiring, user-bound tokens; raw RealDebrid URLs never cross the server/browser boundary. API keys are encrypted at rest with Active Record Encryption.
+Every user-owned query is scoped through `current_user` associations. Playback and media URLs use signed, expiring, user-bound tokens; raw debrid URLs and provider resolve URLs (which embed the debrid key) never cross the server/browser boundary. The debrid key is encrypted at rest with Active Record Encryption.
 
 ## License
 

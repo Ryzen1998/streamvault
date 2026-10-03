@@ -10,6 +10,6 @@ module ResolvedSourceAccess
   end
 
   def source_headers
-    resolved_source.request_headers(current_user)
+    resolved_source.request_headers
   end
 end

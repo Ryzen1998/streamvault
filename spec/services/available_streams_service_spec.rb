@@ -1,7 +1,8 @@
 require "rails_helper"
 
 RSpec.describe AvailableStreamsService do
-  let(:user) { create(:user, realdebrid_api_key: "test_key") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key") }
   let(:cache) { ActiveSupport::Cache::MemoryStore.new }
   let(:provider) { double("provider") }
   subject(:service) { described_class.new(user, providers: [ provider ], cache: cache) }
@@ -54,23 +55,28 @@ RSpec.describe AvailableStreamsService do
     expect(provider).to have_received(:streams).twice
   end
 
-  it "never shares credential-bearing stream listings between users" do
-    other_user = create(:user, realdebrid_api_key: "other_test_key")
-    other_provider = double("other provider")
+  it "does not reuse listings built for a previous debrid account" do
     allow(provider).to receive(:streams).and_return(
-      stream_result(resolve_url: "https://provider.test/resolve/test_key/movie.mp4")
-    )
-    allow(other_provider).to receive(:streams).and_return(
-      stream_result(resolve_url: "https://provider.test/resolve/other_test_key/movie.mp4")
+      stream_result(resolve_url: "https://provider.test/resolve/test_key/movie.mp4"),
+      stream_result(resolve_url: "https://provider.test/resolve/tb_key/movie.mp4")
     )
 
     first = service.call(imdb_id: "tt1375666", type: "movie")
-    second = described_class.new(other_user, providers: [ other_provider ], cache: cache)
+    debrid_account.update!(service: "torbox", api_key: "tb_key")
+    second = described_class.new(user, providers: [ provider ], cache: cache)
       .call(imdb_id: "tt1375666", type: "movie")
 
     expect(first.data.first.resolve_url).to include("/test_key/")
-    expect(second.data.first.resolve_url).to include("/other_test_key/")
-    expect(provider).to have_received(:streams).once
-    expect(other_provider).to have_received(:streams).once
+    expect(second.data.first.resolve_url).to include("/tb_key/")
+    expect(provider).to have_received(:streams).twice
+  end
+
+  it "keeps the debrid key out of cache keys" do
+    allow(provider).to receive(:streams).and_return(stream_result)
+    allow(cache).to receive(:write).and_call_original
+
+    service.call(imdb_id: "tt1375666", type: "movie")
+
+    expect(cache).to have_received(:write).with(satisfy { |key| !key.include?("test_key") }, anything, anything)
   end
 end

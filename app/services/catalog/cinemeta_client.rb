@@ -71,10 +71,16 @@ module Catalog
       catalog(type, "imdbRating", limit: limit)
     end
 
-    def catalog(type, catalog_id, genre: nil, limit: 20)
-      path = "catalog/#{cinemeta_type(type)}/#{catalog_id}.json"
-      path += "?genre=#{CGI.escape(genre)}" if genre.present?
-      cache_key = "catalog/cinemeta/#{type}/#{catalog_id}/#{genre}/#{limit}"
+    def catalog(type, catalog_id, genre: nil, limit: 20, skip: nil)
+      # Cinemeta follows the Stremio extra-args convention: the arguments are a
+      # path segment (`/catalog/movie/year/genre=2026&skip=20.json`), not a
+      # query string — `?skip=` is silently ignored.
+      extras = {}
+      extras["genre"] = genre if genre.present?
+      extras["skip"] = skip if skip.present? && skip.to_i.positive?
+      base = "catalog/#{cinemeta_type(type)}/#{catalog_id}"
+      path = extras.empty? ? "#{base}.json" : "#{base}/#{URI.encode_www_form(extras)}.json"
+      cache_key = "catalog/cinemeta/#{type}/#{catalog_id}/#{genre}/#{limit}/#{skip}"
       items = @cache.fetch(cache_key, expires_in: CACHE_TTL, race_condition_ttl: 30.seconds) do
         response = @connection.get(path)
         next [] unless response.success? && response.body.is_a?(Hash)

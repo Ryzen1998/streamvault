@@ -19,3 +19,7 @@ production:
   cleanup_hls_sessions:
     command: "HlsSessionManager.cleanup_expired"
     schedule: every 5 minutes
+  # Keep the debrid plan/expiry on Admin -> Debrid current.
+  refresh_debrid_account:
+    class: DebridAccountRefreshJob
+    schedule: every day at 6am

@@ -6,21 +6,23 @@ require "json"
 # Stream provider for self-hosted Comet (https://github.com/g0ldyy/comet).
 #
 # Comet speaks the standard Stremio addon protocol — /stream/{type}/{id}.json
-# returns { "streams": [...] } — but the RealDebrid API key and user
+# returns { "streams": [...] } — but the debrid service, its API key and
 # preferences are encoded in a base64 config path segment instead of the
-# /realdebrid={key}/ prefix that Torrentio uses.
+# /torbox={key}/ style prefix that Torrentio uses.
 #
 # Comet's config is a JSON object base64-encoded for the URL:
-#   {"debridService":"realdebrid","debridApiKey":"<key>","...":"..."}
+#   {"debridService":"torbox","debridApiKey":"<key>","...":"..."}
 # The stream path becomes:
 #   /{b64config}/stream/{type}/{id}.json
 #
-# When no config is needed (no RD key, default options), Comet serves at:
+# When no config is needed (no debrid account, default options), Comet serves at:
 #   /stream/{type}/{id}.json
 #
 # Resolve URLs in Comet's stream response point to the Comet host's
-# /{b64config}/playback/... endpoint, which 302-redirects to the
-# RealDebrid direct download URL — same follow-redirect flow as Torrentio.
+# /{b64config}/playback/... endpoint, which 302-redirects to the debrid
+# direct download URL — same follow-redirect flow as Torrentio.
+#
+# The config segment carries the API key, so it is never logged.
 class CometService
   def self.comet_url
     ENV.fetch("COMET_URL", "")
@@ -30,8 +32,8 @@ class CometService
     ENV.fetch("COMET_PROXY", "")
   end
 
-  def initialize(rd_api_key: nil)
-    @rd_api_key = rd_api_key
+  def initialize(debrid: nil)
+    @debrid = debrid
     @parser = Streams::ReleaseParser.new
     @comet = Faraday.new(url: self.class.comet_url) do |f|
       f.request :json
@@ -61,11 +63,11 @@ class CometService
     elsif response.status == 404
       ServiceResult.success([])
     else
-      Rails.logger.error("[CometService] streams request failed: HTTP #{response.status} for #{path}")
+      Rails.logger.error("[CometService] streams request failed: HTTP #{response.status} for #{loggable(path)}")
       ServiceResult.failure("Failed to fetch streams from Comet (HTTP #{response.status})")
     end
   rescue Faraday::TimeoutError
-    Rails.logger.error("[CometService] streams request timed out for #{path}")
+    Rails.logger.error("[CometService] streams request timed out for #{loggable(path)}")
     ServiceResult.failure("Comet stream request timed out")
   rescue Faraday::ConnectionFailed => e
     Rails.logger.error("[CometService] streams connection failed: #{e.message}")
@@ -96,14 +98,19 @@ class CometService
     "#{prefix}/stream/#{episode_path}.json"
   end
 
-  # Build the base64-encoded config path segment.  When the RD key is
-  # absent, return nil so Comet serves at the default (no-config) path.
+  # Drops the base64 config segment (which encodes the debrid API key).
+  def loggable(path)
+    path.to_s.sub(%r{\A/[^/]+(?=/stream/)}, "/[config]")
+  end
+
+  # Build the base64-encoded config path segment.  Without a debrid account,
+  # return nil so Comet serves at the default (no-config) path.
   def build_config
-    return nil if @rd_api_key.blank?
+    return nil unless @debrid
 
     config = {
-      "debridService" => "realdebrid",
-      "debridApiKey" => @rd_api_key,
+      "debridService" => @debrid.service,
+      "debridApiKey" => @debrid.api_key,
       "cachedOnly" => true,
       "enableTorrent" => false,
       "scrapeDebridAccountTorrents" => true
@@ -140,13 +147,22 @@ class CometService
         title: title, info_hash: info_hash, file_idx: stream["fileIdx"], name: stream["name"],
         quality: @parser.quality(stream["name"].presence || title),
         seeders: extract_seeders(stream, description), size: @parser.format_size(size), raw_size: size,
-        rd_plus: stream["name"].to_s.include?("⚡"), filename: filename,
+        cached: stream["name"].to_s.include?("⚡"), filename: filename,
         resolve_url: stream["url"].to_s, languages: @parser.languages(description),
         video_codec: attributes[:video_codec], audio_codec: attributes[:audio_codec],
         container: attributes[:container], compatibility_score: attributes[:compatibility_score],
-        provider: self.class.name
+        provider: self.class.name, request_headers: proxy_request_headers(stream)
       )
     end
+  end
+
+  def proxy_request_headers(stream)
+    hints = stream["behaviorHints"]
+    proxy = hints["proxyHeaders"] if hints.is_a?(Hash)
+    proxy ||= stream["proxyHeaders"]
+    return {} unless proxy.is_a?(Hash)
+
+    Streams::ProxyHeaders.sanitize(proxy["request"])
   end
 
   def extract_seeders(stream, description = nil)

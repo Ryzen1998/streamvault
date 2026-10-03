@@ -6,8 +6,8 @@ require 'rails_helper'
 # shape (captured from a live Comet instance) so the parsing assertions reflect
 # what StreamVault actually receives in production.
 RSpec.describe CometService do
-  let(:rd_api_key) { "test_rd_key_123" }
-  let(:service) { described_class.new(rd_api_key: rd_api_key) }
+  let(:debrid) { Debrid::Account.new(service: "realdebrid", api_key: "test_rd_key_123") }
+  let(:service) { described_class.new(debrid: debrid) }
 
   # A cached (instantly playable) 4K release, as Comet returns it.
   let(:cached_stream) do
@@ -63,7 +63,7 @@ RSpec.describe CometService do
 
     it "returns failure when COMET_URL is not configured" do
       ENV["COMET_URL"] = ""
-      result = described_class.new(rd_api_key: rd_api_key).streams("tt1375666", "movie")
+      result = described_class.new(debrid: debrid).streams("tt1375666", "movie")
       expect(result).to be_failure
       expect(result.error_message).to include("not configured")
     end
@@ -151,14 +151,14 @@ RSpec.describe CometService do
       expect(stream[:size]).to eq("50.4 GB")
     end
 
-    it "marks cached (⚡) streams as rd_plus for cached-first sorting" do
+    it "marks cached (⚡) streams as cached for cached-first sorting" do
       stub_streams("tt2015381", "movie", [ cached_stream, uncached_stream ])
 
       streams = service.streams("tt2015381", "movie").data
       cached = streams.find { |s| s[:title].include?("Guardians") }
       on_demand = streams.find { |s| s[:title].include?("Inception") }
-      expect(cached[:rd_plus]).to be true
-      expect(on_demand[:rd_plus]).to be false
+      expect(cached[:cached]).to be true
+      expect(on_demand[:cached]).to be false
     end
 
     it "extracts seeders from the 👤 marker in the description" do
@@ -214,16 +214,41 @@ RSpec.describe CometService do
       # It must still round-trip to the expected debrid config.
       config = JSON.parse(Base64.urlsafe_decode64(captured_config))
       expect(config["debridService"]).to eq("realdebrid")
-      expect(config["debridApiKey"]).to eq(rd_api_key)
+      expect(config["debridApiKey"]).to eq("test_rd_key_123")
       expect(config["cachedOnly"]).to be true
       expect(config["enableTorrent"]).to be false
       expect(config["scrapeDebridAccountTorrents"]).to be true
     end
 
-    it "omits the config segment when no RD key is provided" do
+    it "configures Comet for TorBox when that is the instance service" do
+      captured_config = nil
+      stub_request(:get, %r{comet\.example\.com/([^/]+)/stream/movie/tt1375666\.json})
+        .to_return do |request|
+          captured_config = URI.parse(request.uri.to_s).path.split("/")[1]
+          { status: 200, body: { "streams" => [] }.to_json, headers: { "Content-Type" => "application/json" } }
+        end
+
+      torbox = Debrid::Account.new(service: "torbox", api_key: "tb_key")
+      described_class.new(debrid: torbox).streams("tt1375666", "movie")
+
+      config = JSON.parse(Base64.urlsafe_decode64(captured_config))
+      expect(config).to include("debridService" => "torbox", "debridApiKey" => "tb_key")
+    end
+
+    it "keeps the key-bearing config segment out of error logs" do
+      stub_request(:get, %r{comet\.example\.com/([^/]+)/stream/movie/tt1375666\.json}).to_return(status: 500)
+      allow(Rails.logger).to receive(:error)
+
+      service.streams("tt1375666", "movie")
+
+      expect(Rails.logger).to have_received(:error)
+        .with("[CometService] streams request failed: HTTP 500 for /[config]/stream/movie/tt1375666.json")
+    end
+
+    it "omits the config segment when no debrid account is configured" do
       stub_request(:get, %r{comet\.example\.com/stream/movie/tt1375666\.json})
 
-      described_class.new(rd_api_key: nil).streams("tt1375666", "movie")
+      described_class.new(debrid: nil).streams("tt1375666", "movie")
 
       expect(WebMock).to have_requested(:get, %r{comet\.example\.com/stream/movie/tt1375666\.json})
         .at_least_once
@@ -245,7 +270,7 @@ RSpec.describe StreamProvider do
     it "returns only Torrentio by default" do
       ENV["STREAM_PROVIDER"] = "torrentio"
       ENV["COMET_URL"] = ""
-      providers = described_class.providers(rd_api_key: "key")
+      providers = described_class.providers(debrid: nil)
       expect(providers.length).to eq(1)
       expect(providers.first).to be_a(Streams::TorrentioProvider)
     end
@@ -253,7 +278,7 @@ RSpec.describe StreamProvider do
     it "returns Comet then Torrentio when STREAM_PROVIDER=comet" do
       ENV["STREAM_PROVIDER"] = "comet"
       ENV["COMET_URL"] = "http://comet:8000"
-      providers = described_class.providers(rd_api_key: "key")
+      providers = described_class.providers(debrid: nil)
       expect(providers.length).to eq(2)
       expect(providers.first).to be_a(CometService)
       expect(providers.last).to be_a(Streams::TorrentioProvider)
@@ -262,7 +287,7 @@ RSpec.describe StreamProvider do
     it "returns Comet then Torrentio when STREAM_PROVIDER=auto and COMET_URL set" do
       ENV["STREAM_PROVIDER"] = "auto"
       ENV["COMET_URL"] = "http://comet:8000"
-      providers = described_class.providers(rd_api_key: "key")
+      providers = described_class.providers(debrid: nil)
       expect(providers.length).to eq(2)
       expect(providers.first).to be_a(CometService)
     end
@@ -270,7 +295,7 @@ RSpec.describe StreamProvider do
     it "returns only Torrentio when STREAM_PROVIDER=auto and COMET_URL blank" do
       ENV["STREAM_PROVIDER"] = "auto"
       ENV["COMET_URL"] = ""
-      providers = described_class.providers(rd_api_key: "key")
+      providers = described_class.providers(debrid: nil)
       expect(providers.length).to eq(1)
       expect(providers.first).to be_a(Streams::TorrentioProvider)
     end

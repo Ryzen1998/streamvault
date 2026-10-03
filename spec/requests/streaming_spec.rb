@@ -1,12 +1,17 @@
 require 'rails_helper'
 
 RSpec.describe "Streaming", type: :request do
-  let(:user) { create(:user, realdebrid_api_key: "test_key") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key") }
 
   around do |ex|
     ENV["STREAM_PROVIDER"] = "torrentio"
     ex.run
     ENV.delete("STREAM_PROVIDER")
+  end
+
+  def stream_token(resolve_url, **attributes)
+    StreamSelection.issue(user: user, candidate: StreamCandidate.new(resolve_url: resolve_url, **attributes))
   end
 
   def expect_playback_redirect(user:, source_url:, **attributes)
@@ -26,19 +31,45 @@ RSpec.describe "Streaming", type: :request do
       end
     end
 
-    context "when authenticated without RealDebrid key" do
-      let(:user_no_key) { create(:user, realdebrid_api_key: nil) }
+    context "when no debrid account is configured" do
+      before { DebridAccount.delete_all }
 
-      before { sign_in user_no_key }
-
-      it "redirects to settings" do
+      it "sends users home with a note to ask an admin" do
+        sign_in user
         post streaming_index_path, params: { imdb_id: "tt1375666", type: "movie" }
-        expect(response).to redirect_to(settings_path)
+
+        expect(response).to redirect_to(root_path)
+        expect(flash[:alert]).to include("Ask an admin")
+      end
+
+      it "sends admins to the debrid admin page" do
+        sign_in create(:user, :admin)
+        post streaming_index_path, params: { imdb_id: "tt1375666", type: "movie" }
+
+        expect(response).to redirect_to(admin_debrid_path)
       end
     end
 
-    context "when authenticated with RealDebrid key" do
+    context "when the instance debrid account is configured" do
       before { sign_in user }
+
+      before do
+        # Default (empty) listing for fallback lookups; tests override it.
+        stub_request(:get, %r{torrentio\.strem\.fun/([^/]+/)?stream/movie/tt1375666\.json})
+          .to_return(status: 200, body: { "streams" => [] }.to_json, headers: { "Content-Type" => "application/json" })
+      end
+
+      it "rejects a stream token issued to another user" do
+        other_token = StreamSelection.issue(
+          user: create(:user),
+          candidate: StreamCandidate.new(resolve_url: "https://torrentio.strem.fun/resolve/realdebrid/test_key/abc123/null/0/Inception.mp4")
+        )
+
+        post streaming_index_path, params: { imdb_id: "tt1375666", type: "movie", stream_token: other_token }
+
+        expect(response).to redirect_to(root_path)
+        expect(flash[:alert]).to include("expired")
+      end
 
       it "starts a stream and redirects to player page" do
         stub_request(:get, "https://v3-cinemeta.strem.io/meta/movie/tt1375666.json")
@@ -88,8 +119,7 @@ RSpec.describe "Streaming", type: :request do
           imdb_id: "tt1375666",
           type: "movie",
           title: "Inception",
-          resolve_url: "https://torrentio.strem.fun/resolve/realdebrid/test_key/abc123/null/0/Inception.mp4",
-          filename: "Inception.mp4"
+          stream_token: stream_token("https://torrentio.strem.fun/resolve/realdebrid/test_key/abc123/null/0/Inception.mp4", filename: "Inception.mp4")
         }
 
         expect_playback_redirect(
@@ -131,10 +161,7 @@ RSpec.describe "Streaming", type: :request do
           type: "movie",
           title: "Inception",
           duration: 8_880,
-          resolve_url: selected_url,
-          filename: "Inception4K.mkv",
-          raw_size: 92_898_311_496,
-          video_codec: "hevc"
+          stream_token: stream_token(selected_url, filename: "Inception4K.mkv", raw_size: 92_898_311_496, video_codec: "hevc")
         }
 
         expect_playback_redirect(
@@ -166,8 +193,7 @@ RSpec.describe "Streaming", type: :request do
           imdb_id: "tt1375666",
           type: "movie",
           title: "Inception",
-          resolve_url: "https://torrentio.strem.fun/resolve/realdebrid/test_key/abc123/null/0/Inception.mp4",
-          filename: "Inception.mp4"
+          stream_token: stream_token("https://torrentio.strem.fun/resolve/realdebrid/test_key/abc123/null/0/Inception.mp4", filename: "Inception.mp4")
         }
 
         expect_playback_redirect(
@@ -281,8 +307,7 @@ RSpec.describe "Streaming", type: :request do
           imdb_id: "tt1375666",
           type: "movie",
           title: "Inception",
-          resolve_url: "https://torrentio.strem.fun/resolve/realdebrid/test_key/blocked/null/0/Inception.mkv",
-          filename: "Inception.mkv"
+          stream_token: stream_token("https://torrentio.strem.fun/resolve/realdebrid/test_key/blocked/null/0/Inception.mkv", filename: "Inception.mkv")
         }
 
         expect_playback_redirect(

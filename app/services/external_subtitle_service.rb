@@ -8,8 +8,9 @@ class ExternalSubtitleService
   WINDOW_LOOK_BEHIND_SECONDS = 5
   CACHE_TTL = 12.hours
 
+  # SubDL and subtitle addons, queried in parallel.
   def self.search(imdb_id:, type:, season: nil, episode: nil, title: nil, filename: nil, preferred_languages: [], default_language: nil)
-    subdl_provider.search(
+    query = {
       imdb_id: imdb_id,
       type: type,
       season: season,
@@ -18,7 +19,8 @@ class ExternalSubtitleService
       filename: filename,
       preferred_languages: preferred_languages,
       default_language: default_language
-    )
+    }
+    providers.values.map { |provider| Thread.new { provider.search(**query) } }.flat_map(&:value)
   end
 
   def self.external_stream?(value)
@@ -33,7 +35,7 @@ class ExternalSubtitleService
   def self.extract_subtitles(stream_id, start_seconds: 0, duration_seconds: Media::Subtitles::DEFAULT_WINDOW_SECONDS)
     provider, payload = parse_stream_id(stream_id)
     return subtitle_result(:invalid_stream, diagnostic: "invalid external subtitle stream") unless provider && payload
-    return subtitle_result(:unsupported_track, diagnostic: "external subtitle provider is not available") unless provider == "subdl"
+    return subtitle_result(:unsupported_track, diagnostic: "external subtitle provider is not available") unless providers.key?(provider)
 
     cues_result = cached_cues(provider, payload)
     return cues_result if cues_result.is_a?(Media::Subtitles::ExtractionResult)
@@ -60,6 +62,20 @@ class ExternalSubtitleService
     @subdl_provider = provider
   end
 
+  def self.addon_provider
+    @addon_provider ||= Addons::SubtitleSource.new
+  end
+
+  def self.addon_provider=(provider)
+    @addon_provider = provider
+  end
+
+  # Track ids carry the provider name: "external:<provider>:<payload>".
+  def self.providers
+    { "subdl" => subdl_provider, "addon" => addon_provider }
+  end
+  private_class_method :providers
+
   def self.parse_stream_id(stream_id)
     prefix, provider, encoded = stream_id.to_s.split(":", 3)
     return nil unless "#{prefix}:" == STREAM_PREFIX && provider.present? && encoded.present?
@@ -76,7 +92,7 @@ class ExternalSubtitleService
     cached = Rails.cache.read(cache_key)
     return cached if cached
 
-    download_result = subdl_provider.download(payload)
+    download_result = providers.fetch(provider).download(payload)
     return subtitle_result(:failed, source: provider, diagnostic: download_result.error_message) if download_result.failure?
 
     cues = parse_subtitle_file(download_result.data)

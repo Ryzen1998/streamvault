@@ -61,6 +61,20 @@ RSpec.describe "Home", type: :request do
         expect(response).to have_http_status(:ok)
       end
 
+      it "shows a View all link for catalog rows" do
+        stub_request(:get, %r{v3-cinemeta\.strem\.io/catalog/movie/top})
+          .to_return(
+            status: 200,
+            body: { "metas" => [ { "id" => "tt1", "name" => "Row Item" } ] }.to_json,
+            headers: { "Content-Type" => "application/json" }
+          )
+
+        get root_path
+
+        expect(response.body).to include("Row Item")
+        expect(response.body).to include("View all")
+      end
+
       it "does not show another user's cached recommendations" do
         other_user = create(:user)
         cache.write("recommendations/user/#{other_user.id}", [

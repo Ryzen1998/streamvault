@@ -1,0 +1,60 @@
+<%= form_with model: [ :admin, @user ], class: "space-y-6" do |f| %>
+  <% if @user.errors.any? %>
+    <div class="bg-red-900/20 border border-red-800/40 rounded-lg p-4">
+      <ul class="list-disc list-inside text-sm text-red-300">
+        <% @user.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="bg-sv-surface rounded-xl p-6 border border-sv-border space-y-4">
+    <div>
+      <%= f.label :email, class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+      <% if @user.persisted? %>
+        <input type="email" value="<%= @user.email %>" class="input-field" disabled>
+      <% else %>
+        <%= f.email_field :email, class: "input-field", autocomplete: "off", required: true %>
+      <% end %>
+    </div>
+
+    <div>
+      <%= f.label :display_name, "Display name (optional)", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+      <%= f.text_field :display_name, class: "input-field", maxlength: 50 %>
+    </div>
+
+    <% unless @user.persisted? %>
+      <div>
+        <%= f.label :password, "Password (optional)", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+        <%= f.password_field :password, class: "input-field", autocomplete: "new-password", placeholder: "Leave blank to generate one" %>
+        <p class="text-xs text-sv-text-muted mt-1">A generated password is shown once after saving.</p>
+      </div>
+    <% end %>
+
+    <div class="border-t border-sv-border pt-4 space-y-3">
+      <label class="inline-flex items-start gap-2 text-sm text-sv-text">
+        <%= f.check_box :admin, class: "rounded mt-0.5" %>
+        <span>
+          Admin
+          <span class="block text-xs text-sv-text-muted mt-0.5">Can manage users, the debrid account and addons.</span>
+        </span>
+      </label>
+
+      <% if @user.persisted? %>
+        <label class="flex items-start gap-2 text-sm text-sv-text">
+          <%= f.check_box :disabled, { checked: @user.disabled?, class: "rounded mt-0.5" }, "1", "0" %>
+          <span>
+            Disabled
+            <span class="block text-xs text-sv-text-muted mt-0.5">Blocks sign-in and ends any open sessions. Their history is kept.</span>
+          </span>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <%= f.submit @user.persisted? ? "Save user" : "Add user", class: "btn-primary cursor-pointer" %>
+    <%= link_to "Cancel", admin_users_path, class: "text-sm text-sv-text-muted hover:text-white" %>
+  </div>
+<% end %>

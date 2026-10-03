@@ -12,6 +12,10 @@ Rails.application.routes.draw do
   get "content/:type/:imdb_id/status", to: "content#status", as: :content_status
   get "content/:type/:imdb_id/episode_streams", to: "content#episode_streams", as: :episode_streams
 
+  # Catalog browsing (addon / Cinemeta), paginated by offset
+  get "catalog/:type/:catalog_id", to: "catalog#index", as: :catalog,
+      constraints: { type: /movie|show/, catalog_id: %r{[^/]+} }
+
   # Collection
   resources :library, only: [ :index ]
   resources :wishlist, only: [ :index ]
@@ -49,9 +53,38 @@ Rails.application.routes.draw do
   get "hls/:id/:segment", to: "hls#segment", as: :hls_segment, constraints: { segment: /\d+\.ts/ }
   post "hls/:id/stop", to: "hls#stop", as: :hls_stop
 
+  # Per-account watch statistics
+  get "stats", to: "stats#show", as: :stats
+
   # Settings
   get "settings", to: "settings#show", as: :settings
   patch "settings", to: "settings#update"
+
+  # Per-account Simkl link (PIN pairing, history sync)
+  scope "settings" do
+    resource :simkl, only: [ :show, :create, :destroy ], controller: "simkl" do
+      get :status
+      post :sync
+      post :import_watchlist
+    end
+  end
+
+  # Admin — debrid account and addon management (admin users only)
+  namespace :admin do
+    resources :users, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        post :reset_password
+      end
+    end
+
+    resource :debrid, only: [ :show, :update, :destroy ], controller: "debrid"
+
+    resources :addons, only: [ :index, :new, :create, :edit, :update, :destroy ] do
+      member do
+        post :refresh
+      end
+    end
+  end
 
   # Direct stream proxy (bypass ffmpeg for browser-compatible content)
   get "direct_stream", to: "direct_stream#show", as: :direct_stream
