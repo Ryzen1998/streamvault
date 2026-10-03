@@ -10,6 +10,10 @@ module Addons
   #   GET {base}/stream/{type}/{id}.json          -> { "streams": [...] }
   #   GET {base}/catalog/{type}/{id}.json         -> { "metas": [...] }
   #   GET {base}/meta/{type}/{id}.json            -> { "meta": {...} }
+  #   GET {base}/subtitles/{type}/{id}.json       -> { "subtitles": [...] }
+  #
+  # Extra arguments (search, genre, skip, filename) go in a final path segment:
+  # {base}/catalog/movie/top/search=the+matrix.json
   #
   # `type` is "movie" or "series"; `id` is an IMDB id (tt123) or, for episodes,
   # "tt123:season:episode". The client never sends debrid credentials — the
@@ -107,8 +111,8 @@ module Addons
       Array(manifest["catalogs"]).select { |catalog| catalog.is_a?(Hash) && catalog["type"].present? && catalog["id"].present? }
     end
 
-    def catalog(type, catalog_id, skip: nil, genre: nil)
-      response = @connection.get(catalog_path(type, catalog_id, skip: skip, genre: genre))
+    def catalog(type, catalog_id, skip: nil, genre: nil, search: nil)
+      response = @connection.get(catalog_path(type, catalog_id, skip: skip, genre: genre, search: search))
       if response.success? && response.body.is_a?(Hash)
         ServiceResult.success(Array(response.body["metas"]))
       else
@@ -133,6 +137,37 @@ module Addons
     rescue StandardError => e
       @logger.warn("[Addons::Client] meta error: #{e.class}: #{e.message}")
       ServiceResult.failure("Meta request failed")
+    end
+
+    def subtitles(type, imdb_id, season: nil, episode: nil, filename: nil)
+      response = @connection.get(subtitles_path(type, imdb_id, season: season, episode: episode, filename: filename))
+      if response.success? && response.body.is_a?(Hash)
+        ServiceResult.success(Array(response.body["subtitles"]))
+      elsif response.status == 404
+        ServiceResult.success([])
+      else
+        ServiceResult.failure("Subtitles returned HTTP #{response.status}")
+      end
+    rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
+      ServiceResult.failure("Subtitles request failed (#{e.class})")
+    rescue StandardError => e
+      @logger.warn("[Addons::Client] subtitles error: #{e.class}: #{e.message}")
+      ServiceResult.failure("Subtitles request failed")
+    end
+
+    # Whether the manifest declares `resource` for this type and id. Resources
+    # are plain names or objects with their own types/idPrefixes, which
+    # default to the manifest-level ones.
+    def serves?(resource, type:, id:)
+      Array(manifest["resources"]).any? do |entry|
+        name, types, prefixes = entry.is_a?(Hash) ? entry.values_at("name", "types", "idPrefixes") : [ entry.to_s, nil, nil ]
+        next false unless name == resource
+
+        types = Array(types.presence || manifest["types"])
+        prefixes = Array(prefixes.presence || manifest["idPrefixes"])
+        (types.empty? || types.include?(media_type(type))) &&
+          (prefixes.empty? || prefixes.any? { |prefix| id.to_s.start_with?(prefix.to_s) })
+      end
     end
 
     def manifest_id
@@ -180,8 +215,17 @@ module Addons
       end
     end
 
-    def catalog_path(type, catalog_id, skip:, genre:)
+    def subtitles_path(type, imdb_id, season:, episode:, filename:)
+      id = media_type(type) == "series" && season.present? && episode.present? ? "#{imdb_id}:#{season}:#{episode}" : imdb_id
+      path = "#{@base_url}/subtitles/#{media_type(type)}/#{id}"
+      return "#{path}.json" if filename.blank?
+
+      "#{path}/#{URI.encode_www_form("filename" => filename)}.json"
+    end
+
+    def catalog_path(type, catalog_id, skip:, genre:, search: nil)
       extras = {}
+      extras["search"] = search if search.present?
       extras["genre"] = genre if genre.present?
       extras["skip"] = skip if skip.present? && skip.to_i.positive?
       path = "#{@base_url}/catalog/#{media_type(type)}/#{catalog_id}"

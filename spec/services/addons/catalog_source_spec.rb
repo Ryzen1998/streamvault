@@ -98,4 +98,39 @@ RSpec.describe Addons::CatalogSource do
       expect(result.data.map { |item| item[:imdb_id] }).to eq([ "tt9" ])
     end
   end
+
+  describe "#search" do
+    before do
+      stub_json("https://addon.example.com/manifest.json", {
+        "id" => "org.test", "name" => "Test", "resources" => %w[catalog], "types" => %w[movie series],
+        "catalogs" => [
+          { "type" => "movie", "id" => "tmdb.top", "extra" => [ { "name" => "search", "isRequired" => true } ] },
+          { "type" => "series", "id" => "legacy", "extraSupported" => [ "search" ] },
+          { "type" => "movie", "id" => "popular", "extra" => [ { "name" => "genre" } ] }
+        ]
+      })
+    end
+
+    it "searches catalogs that support it and keeps IMDb titles" do
+      stub_json("https://addon.example.com/catalog/movie/tmdb.top/search=the+matrix.json", { "metas" => [
+        { "id" => "tt0133093", "name" => "The Matrix" },
+        { "id" => "kitsu:123", "name" => "Anime Matrix" },
+        { "id" => "tmdb:999", "imdb_id" => "tt0234215", "name" => "The Matrix Reloaded" }
+      ] })
+      stub_json("https://addon.example.com/catalog/series/legacy/search=the+matrix.json", { "metas" => [
+        { "id" => "tt0133093", "name" => "The Matrix" }
+      ] })
+
+      results = source.search("the matrix")
+
+      expect(results.map { |item| [ item[:imdb_id], item[:type] ] })
+        .to contain_exactly([ "tt0133093", "movie" ], [ "tt0234215", "movie" ], [ "tt0133093", "show" ])
+      expect(WebMock).not_to have_requested(:get, %r{catalog/movie/popular})
+    end
+
+    it "does nothing for a blank query" do
+      expect(source.search(" ")).to eq([])
+      expect(WebMock).not_to have_requested(:get, %r{/catalog/})
+    end
+  end
 end

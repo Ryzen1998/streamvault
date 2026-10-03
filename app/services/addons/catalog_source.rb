@@ -8,6 +8,7 @@ module Addons
   # the caller falls back to another source.
   class CatalogSource
     MAX_ROWS = 8
+    MAX_SEARCH_CATALOGS = 6
 
     def initialize(registry: nil, logger: Rails.logger, cache: Rails.cache)
       @entries = registry || Addons::Registry.entries
@@ -27,6 +28,17 @@ module Addons
     rescue StandardError => e
       @logger.warn("[Addons::CatalogSource] rows failed: #{e.class}: #{e.message}")
       []
+    end
+
+    # Searches every addon catalog that declares a `search` extra, in parallel.
+    # Only IMDb-keyed titles are kept, since playback and tracking use IMDb ids.
+    def search(query)
+      return [] if query.blank?
+
+      pairs = catalog_pairs.select { |pair| searchable?(pair[:catalog]) }.first(MAX_SEARCH_CATALOGS)
+      pairs.map { |pair| Thread.new { search_catalog(pair, query) } }
+        .flat_map(&:value)
+        .uniq { |item| [ item[:type], item[:imdb_id] ] }
     end
 
     # First addon that can serve metadata for the id wins.
@@ -81,6 +93,24 @@ module Addons
     rescue StandardError => e
       @logger.warn("[Addons::CatalogSource] catalog row failed: #{e.class}: #{e.message}")
       nil
+    end
+
+    def search_catalog(pair, query)
+      result = pair[:client].catalog(pair[:type], pair[:catalog]["id"], search: query)
+      return [] unless result.success?
+
+      result.data.filter_map { |meta| Addons::MetaAdapter.summary(meta, pair[:type]) }
+        .select { |item| item[:title].present? && item[:imdb_id].match?(ContentRef::IMDB_ID_PATTERN) }
+    rescue StandardError => e
+      @logger.warn("[Addons::CatalogSource] search failed: #{e.class}: #{e.message}")
+      []
+    end
+
+    # Catalog extras come as `extra: [{ "name": "search" }]`, or the legacy
+    # `extraSupported: ["search"]`.
+    def searchable?(catalog)
+      names = Array(catalog["extra"]).filter_map { |extra| extra["name"] if extra.is_a?(Hash) }
+      (names + Array(catalog["extraSupported"])).map(&:to_s).include?("search")
     end
 
     def row_source(pair)

@@ -354,6 +354,16 @@ built from each addon's declared `catalogs`, and detail pages prefer addon
 `meta`; both fall back to Cinemeta when an addon has nothing to offer, so the UI
 never breaks.
 
+**Search** — catalogs that declare a `search` extra are searched alongside
+Cinemeta. Addon results come first; titles without an IMDb id are skipped,
+since playback and tracking are keyed on IMDb ids.
+
+**Subtitles** — addons that serve the `subtitles` resource (for example
+OpenSubtitles v3) add tracks to the player next to embedded and SubDL ones,
+filtered to each account's languages. Subtitle URLs never reach the browser:
+tracks carry a signed id, and the server fetches only the URLs it listed, from
+public addresses only.
+
 **Managing addons** — an account with the admin role sees **Settings → Addons**.
 Paste an addon's `manifest.json` URL; StreamVault verifies it before saving.
 Addons may also be bootstrapped via the `STREMIO_ADDONS` environment variable

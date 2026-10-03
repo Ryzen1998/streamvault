@@ -40,8 +40,16 @@ module Catalog
       @cinemeta.metadata(imdb_id, type)
     end
 
+    # Searchable addon catalogs first, then Cinemeta, one entry per title.
+    # Cinemeta alone when no addon can search or all of them fail.
     def search(query)
-      @cinemeta.search(query)
+      addon_search = Thread.new { safely { @addons.search(query) } }
+      cinemeta = @cinemeta.search(query)
+      addon_results = Array(addon_search.value)
+      return cinemeta if addon_results.empty?
+
+      merged = addon_results + (cinemeta.success? ? cinemeta.data : [])
+      ServiceResult.success(merged.uniq { |item| [ item[:type], item[:imdb_id] ] })
     end
 
     # One page of a catalog.

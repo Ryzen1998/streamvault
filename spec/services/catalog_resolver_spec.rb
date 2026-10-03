@@ -62,8 +62,28 @@ RSpec.describe Catalog::Resolver do
   end
 
   describe "#search" do
-    it "delegates to Cinemeta" do
+    it "uses Cinemeta when no addon can search" do
+      allow(addons).to receive(:search).with("dune").and_return([])
       allow(cinemeta).to receive(:search).with("dune").and_return(ServiceResult.success([ { imdb_id: "tt1" } ]))
+
+      expect(resolver.search("dune").data).to eq([ { imdb_id: "tt1" } ])
+    end
+
+    it "puts addon results first and drops Cinemeta duplicates" do
+      allow(addons).to receive(:search).with("dune").and_return([
+        { imdb_id: "tt1160419", type: "movie", title: "Dune (addon)" }
+      ])
+      allow(cinemeta).to receive(:search).with("dune").and_return(ServiceResult.success([
+        { imdb_id: "tt1160419", type: "movie", title: "Dune" },
+        { imdb_id: "tt15239678", type: "movie", title: "Dune: Part Two" }
+      ]))
+
+      expect(resolver.search("dune").data.map { |item| item[:title] }).to eq([ "Dune (addon)", "Dune: Part Two" ])
+    end
+
+    it "falls back to Cinemeta when addon search raises" do
+      allow(addons).to receive(:search).and_raise(StandardError, "boom")
+      allow(cinemeta).to receive(:search).and_return(ServiceResult.success([ { imdb_id: "tt1" } ]))
 
       expect(resolver.search("dune")).to be_success
     end
