@@ -4,7 +4,7 @@ class HlsController < ApplicationController
   include ResolvedSourceAccess
 
   # The start/stop endpoints require an authenticated user (they
-  # access current_user and the RealDebrid API key).  The playlist
+  # access current_user and the debrid source headers).  The playlist
   # and segment endpoints must NOT require authentication — iOS
   # Safari's <video> element fetches media resources without sending
   # session cookies, so cookie-based auth would reject those requests

@@ -149,7 +149,7 @@ export default class extends Controller {
 
     // Show source info
     this.sourceInfoTarget.classList.remove("hidden")
-    this.sourceUrlTarget.textContent = "Protected RealDebrid source"
+    this.sourceUrlTarget.textContent = "Protected debrid source"
     this.sourceFilenameTarget.textContent = this.filenameValue || "Unknown"
     this.showOverlayUi()
     this.element.addEventListener("mousemove", this.mouseMoveHandler)

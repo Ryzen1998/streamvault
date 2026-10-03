@@ -45,7 +45,7 @@ module Streams
       [
         candidate.language_score,
         -candidate.compatibility_score,
-        candidate.rd_plus ? 0 : 1,
+        candidate.cached ? 0 : 1,
         QUALITY_ORDER.fetch(candidate.quality.to_s, QUALITY_ORDER["Unknown"]),
         -candidate.raw_size
       ]

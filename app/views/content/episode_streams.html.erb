@@ -6,7 +6,7 @@
       <div class="flex items-center justify-between gap-3 p-2 bg-sv-surface-hover rounded-lg">
         <div class="min-w-0 flex-1 overflow-hidden">
           <div class="flex items-center gap-1.5">
-            <% if stream[:rd_plus] %><span class="badge badge-success text-xs shrink-0">RD+</span><% end %>
+            <% if stream[:cached] %><span class="badge badge-success text-xs shrink-0">Cached</span><% end %>
             <span class="text-xs text-white truncate"><%= stream[:title] || stream[:name] %></span>
           </div>
           <div class="flex items-center gap-1.5 mt-1">
@@ -18,7 +18,7 @@
           </div>
         </div>
         <div class="flex items-center gap-3 shrink-0">
-          <%= button_to "Watch", streaming_index_path, params: { imdb_id: @imdb_id, type: "show", season: @season, episode: @episode, title: "#{@show_title} S#{@season.to_s.rjust(2,'0')}E#{@episode.to_s.rjust(2,'0')}", poster_url: @poster_url, duration: @episode_duration_seconds, resolve_url: stream[:resolve_url], filename: stream[:filename], raw_size: stream[:raw_size], video_codec: stream[:video_codec], compatibility_score: stream[:compatibility_score] }, class: "btn-primary text-xs px-2 py-1", data: { page_loader: "stream", page_loader_message: "Finding a working stream..." } %>
+          <%= button_to "Watch", streaming_index_path, params: { imdb_id: @imdb_id, type: "show", season: @season, episode: @episode, title: "#{@show_title} S#{@season.to_s.rjust(2,'0')}E#{@episode.to_s.rjust(2,'0')}", poster_url: @poster_url, duration: @episode_duration_seconds, stream_token: stream_selection_token(stream) }, class: "btn-primary text-xs px-2 py-1", data: { page_loader: "stream", page_loader_message: "Finding a working stream..." } %>
         </div>
       </div>
     <% end %>

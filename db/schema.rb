@@ -10,7 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_03_120100) do
+  create_table "addons", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_checked_at"
+    t.text "last_error"
+    t.string "manifest_id"
+    t.json "manifest_types"
+    t.string "name"
+    t.integer "position", default: 0, null: false
+    t.boolean "trust_source_hosts", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["enabled"], name: "index_addons_on_enabled"
+    t.index ["url"], name: "index_addons_on_url", unique: true
+  end
+
   create_table "collection_entries", force: :cascade do |t|
     t.integer "content_type", default: 0, null: false
     t.datetime "created_at", null: false
@@ -25,6 +41,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
     t.index ["user_id", "imdb_id"], name: "idx_collection_entries_unique", unique: true
     t.index ["user_id", "list_state"], name: "idx_collection_entries_state"
     t.index ["user_id"], name: "index_collection_entries_on_user_id"
+  end
+
+  create_table "debrid_accounts", force: :cascade do |t|
+    t.text "api_key", null: false
+    t.datetime "created_at", null: false
+    t.text "last_error"
+    t.string "service", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "verified_at"
   end
 
   create_table "hls_sessions", force: :cascade do |t|
@@ -190,13 +215,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_22_050003) do
   end
 
   create_table "users", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.string "default_language"
     t.string "display_name"
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
     t.text "preferred_languages"
-    t.text "realdebrid_api_key"
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"

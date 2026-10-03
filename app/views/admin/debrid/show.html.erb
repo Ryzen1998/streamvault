@@ -1,0 +1,74 @@
+<div class="px-6 py-8 max-w-2xl">
+  <h1 class="text-3xl font-bold text-white">Debrid service</h1>
+  <p class="text-sm text-sv-text-muted mt-1 mb-8">Every user streams through this account. Users can't see or change the key.</p>
+
+  <% if @account.persisted? %>
+    <div class="bg-sv-surface rounded-xl p-5 border border-sv-border mb-6">
+      <div class="flex items-center gap-2">
+        <span class="text-white font-medium"><%= @account.service_name %></span>
+        <% if @account.verified_at %>
+          <span class="badge badge-success">Verified</span>
+        <% else %>
+          <span class="badge badge-warning">Not verified</span>
+        <% end %>
+      </div>
+      <% if @account.verified_at %>
+        <p class="text-xs text-sv-text-muted mt-1">Key verified <%= time_ago_in_words(@account.verified_at) %> ago.</p>
+      <% elsif @account.last_error.present? %>
+        <p class="text-xs text-sv-warning mt-1">Last check failed: <%= @account.last_error %></p>
+      <% end %>
+    </div>
+  <% elsif @environment_account %>
+    <div class="bg-sv-surface rounded-xl p-5 border border-sv-border mb-6">
+      <p class="text-sm text-sv-text">Using <%= @environment_account.name %> from the <code>DEBRID_SERVICE</code> / <code>DEBRID_API_KEY</code> environment variables.</p>
+      <p class="text-xs text-sv-text-muted mt-1">Saving an account here takes precedence over them.</p>
+    </div>
+  <% else %>
+    <div class="bg-sv-accent/10 border border-sv-accent/30 rounded-xl p-5 mb-6">
+      <p class="text-sm text-sv-text">No debrid account yet. Streaming stays off until you add one.</p>
+    </div>
+  <% end %>
+
+  <%= form_with model: @account, url: admin_debrid_path, method: :patch, class: "space-y-6" do |f| %>
+    <% if @account.errors.any? %>
+      <div class="bg-red-900/20 border border-red-800/40 rounded-lg p-4">
+        <ul class="list-disc list-inside text-sm text-red-300">
+          <% @account.errors.full_messages.each do |msg| %>
+            <li><%= msg %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border">
+      <div class="mb-4">
+        <%= f.label :service, "Service", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+        <%= f.select :service, Debrid::SERVICES.map { |id, service| [ service[:name], id ] }, {}, class: "input-field w-auto" %>
+      </div>
+
+      <div>
+        <%= f.label :api_key, "API key", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+        <%= f.password_field :api_key, value: "", class: "input-field", autocomplete: "off",
+              placeholder: @account.persisted? ? "Leave blank to keep the current key" : "Paste the API key" %>
+        <p class="text-xs text-sv-text-muted mt-1">
+          Find it at
+          <% Debrid::SERVICES.each_value.with_index do |service, index| %><%= " or " if index.positive? %><a href="<%= service[:key_url] %>" target="_blank" rel="noopener" class="text-sv-accent"><%= service[:name] %></a><% end %>.
+          StreamVault verifies the key when you save. Switching service needs a new key.
+        </p>
+      </div>
+    </div>
+
+    <%= f.submit "Save", class: "btn-primary cursor-pointer" %>
+  <% end %>
+
+  <% if @account.persisted? %>
+    <div class="mt-6">
+      <%= button_to "Remove account", admin_debrid_path, method: :delete, class: "btn-secondary text-sm" %>
+      <p class="text-xs text-sv-text-muted mt-1">Streaming stops until a new key is added (or falls back to the environment variables, if set).</p>
+    </div>
+  <% end %>
+
+  <div class="mt-8">
+    <%= link_to "← Back to settings", settings_path, class: "text-sm text-sv-accent hover:underline" %>
+  </div>
+</div>

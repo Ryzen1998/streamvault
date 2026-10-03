@@ -1,4 +1,9 @@
 module ApplicationHelper
+  # Encrypted stand-in for a listed stream; its resolve URL embeds the debrid key.
+  def stream_selection_token(stream)
+    StreamSelection.issue(user: current_user, candidate: stream)
+  end
+
   def player_time(seconds)
     total_seconds = seconds.to_f
     return "0:00" unless total_seconds.finite? && total_seconds.positive?

@@ -78,19 +78,13 @@ class PlaybackStartService
 
   private
 
+  # An explicit selection arrives as the server-issued candidate (see
+  # StreamSelection), request headers included; otherwise pick automatically.
   def resolve_stream(content_ref, selection)
-    if selection[:resolve_url].present?
-      candidate = StreamCandidate.new(
-        resolve_url: selection[:resolve_url],
-        filename: selection[:filename],
-        raw_size: selection[:raw_size],
-        video_codec: selection[:video_codec],
-        compatibility_score: selection[:compatibility_score]
-      )
-      @streaming_service.resolve(candidate, content_ref: content_ref, duration: selection[:duration])
-    else
-      @streaming_service.start(content_ref)
-    end
+    candidate = selection[:candidate]
+    return @streaming_service.start(content_ref) unless candidate
+
+    @streaming_service.resolve(candidate, content_ref: content_ref, duration: selection[:duration])
   end
 
   def playback_descriptor(stream:, content_ref:, title:, poster_url:, resume_at:, duration:)
@@ -98,7 +92,12 @@ class PlaybackStartService
     source ||= ResolvedSource.new(url: stream.fetch(:streaming_url), filename: stream[:filename])
 
     PlaybackDescriptor.new(
-      source_token: ResolvedSource.issue(user: @user, url: source.url, filename: source.filename),
+      source_token: ResolvedSource.issue(
+        user: @user,
+        url: source.url,
+        filename: source.filename,
+        upstream_headers: source.upstream_headers
+      ),
       filename: source.filename,
       content_ref: content_ref,
       title: title,

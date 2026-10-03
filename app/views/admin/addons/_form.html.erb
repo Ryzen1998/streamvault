@@ -1,0 +1,54 @@
+<%= form_with model: [ :admin, @addon ], class: "space-y-6" do |f| %>
+  <% if @addon.errors.any? %>
+    <div class="bg-red-900/20 border border-red-800/40 rounded-lg p-4">
+      <ul class="list-disc list-inside text-sm text-red-300">
+        <% @addon.errors.full_messages.each do |msg| %>
+          <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="bg-sv-surface rounded-xl p-6 border border-sv-border">
+    <div class="mb-4">
+      <%= f.label :url, "Manifest URL", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+      <%= f.text_field :url, class: "input-field", placeholder: "https://aiostreams.example.com/stremio/<uuid>/<password>/manifest.json", autocomplete: "off" %>
+      <p class="text-xs text-sv-text-muted mt-1">The addon's <code>manifest.json</code> URL. StreamVault verifies it when you save.</p>
+    </div>
+
+    <div class="mb-4">
+      <%= f.label :name, "Display name (optional)", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+      <%= f.text_field :name, class: "input-field", placeholder: "Taken from the manifest if left blank" %>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <%= f.label :position, "Order", class: "block text-sm font-medium text-sv-text-muted mb-1.5" %>
+        <%= f.number_field :position, class: "input-field" %>
+      </div>
+      <div class="flex items-end">
+        <label class="inline-flex items-center gap-2 text-sm text-sv-text">
+          <%= f.check_box :enabled, class: "rounded" %>
+          Enabled
+        </label>
+      </div>
+    </div>
+
+    <div class="mt-4 border-t border-sv-border pt-4">
+      <label class="inline-flex items-start gap-2 text-sm text-sv-text">
+        <%= f.check_box :trust_source_hosts, class: "rounded mt-0.5" %>
+        <span>
+          Trust playback hosts returned by this addon
+          <span class="block text-xs text-sv-text-muted mt-0.5">
+            Needed when the addon returns playable URLs on per-service proxies or CDNs (e.g. StremThru, MediaFlow, debrid CDNs) instead of its own host. When enabled, any HTTPS host this addon returns is accepted — the public-address guard still applies.
+          </span>
+        </span>
+      </label>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3">
+    <%= f.submit @addon.persisted? ? "Save addon" : "Add addon", class: "btn-primary cursor-pointer" %>
+    <%= link_to "Cancel", admin_addons_path, class: "text-sm text-sv-text-muted hover:text-white" %>
+  </div>
+<% end %>

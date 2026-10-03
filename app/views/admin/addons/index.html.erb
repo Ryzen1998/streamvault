@@ -1,0 +1,60 @@
+<div class="px-6 py-8 max-w-4xl">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-white">Addons</h1>
+      <p class="text-sm text-sv-text-muted mt-1">Installed Stremio addons that provide streams, catalogs, and metadata.</p>
+    </div>
+    <%= link_to "Add addon", new_admin_addon_path, class: "btn-primary text-sm" %>
+  </div>
+
+  <% if @addons.empty? %>
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border text-center">
+      <p class="text-sv-text-muted">No addons configured.</p>
+      <p class="text-xs text-sv-text-muted mt-1">Add a Stremio addon manifest URL (for example your AIOStreams instance) to enable streaming.</p>
+    </div>
+  <% else %>
+    <div class="space-y-3">
+      <% @addons.each do |addon| %>
+        <div class="bg-sv-surface rounded-xl p-5 border border-sv-border">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <span class="text-white font-medium truncate"><%= addon.display_name %></span>
+                <% if addon.enabled %>
+                  <span class="badge badge-success shrink-0">Enabled</span>
+                <% else %>
+                  <span class="badge shrink-0 bg-sv-surface-hover text-sv-text-muted">Disabled</span>
+                <% end %>
+                <% if addon.trust_source_hosts %>
+                  <span class="badge badge-accent shrink-0">Open hosts</span>
+                <% end %>
+              </div>
+              <p class="text-xs text-sv-text-muted mt-1 break-all"><%= addon.url %></p>
+              <p class="text-xs text-sv-text-muted mt-1">
+                <% if addon.manifest_types.present? %>
+                  Types: <%= Array(addon.manifest_types).join(", ") %>
+                <% end %>
+                <% if addon.last_checked_at %>
+                  · Checked <%= time_ago_in_words(addon.last_checked_at) %> ago
+                <% end %>
+              </p>
+              <% if addon.last_error.present? %>
+                <p class="text-xs text-sv-warning mt-1">Last error: <%= addon.last_error %></p>
+              <% end %>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <%= button_to "Refresh", refresh_admin_addon_path(addon), class: "btn-secondary text-xs" %>
+              <%= link_to "Edit", edit_admin_addon_path(addon), class: "btn-secondary text-xs" %>
+              <%= button_to "Remove", admin_addon_path(addon), method: :delete, class: "btn-secondary text-xs",
+                    data: { turbo_confirm: "Remove this addon?" } %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="mt-8">
+    <%= link_to "← Back to settings", settings_path, class: "text-sm text-sv-accent hover:underline" %>
+  </div>
+</div>

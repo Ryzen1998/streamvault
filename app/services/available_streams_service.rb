@@ -5,7 +5,8 @@ class AvailableStreamsService
 
   def initialize(user, providers: nil, cache: Rails.cache, logger: Rails.logger)
     @user = user
-    @providers = providers || StreamProvider.providers(rd_api_key: user&.realdebrid_api_key)
+    @debrid = Debrid.current
+    @providers = providers || StreamProvider.providers(debrid: @debrid)
     @cache = cache
     @logger = logger
   end
@@ -24,7 +25,10 @@ class AvailableStreamsService
 
   def cache_key_for(imdb_id, type, season, episode)
     language_key = Array(@user.stream_language_priority).join(",")
-    "streams/v2/#{@user.cache_key_with_version}/#{imdb_id}/#{type}/#{season}/#{episode}/#{language_key}"
+    # Listings embed the debrid account in their resolve URLs, so switching
+    # accounts must not serve listings built for the previous one.
+    debrid_key = @debrid&.fingerprint || "none"
+    "streams/v3/#{@user.cache_key_with_version}/#{debrid_key}/#{imdb_id}/#{type}/#{season}/#{episode}/#{language_key}"
   end
 
   def fetch_streams(imdb_id, type, season, episode, title)
@@ -55,10 +59,16 @@ class AvailableStreamsService
     return result unless result&.success?
 
     ServiceResult.success(
-      result.data.map { |stream| StreamCandidate.from(stream, provider: provider.class.name) }
+      result.data.map { |stream| StreamCandidate.from(stream, provider: provider_label(provider)) }
     )
   rescue StandardError => e
     @logger.warn("[AvailableStreamsService] #{provider.class.name} failed: #{e.class}: #{e.message}")
     ServiceResult.failure(e.message)
+  end
+
+  # Providers may expose a distinct label (e.g. one per installed addon) so the
+  # resolver interleaves results per source.
+  def provider_label(provider)
+    provider.respond_to?(:provider_label) ? provider.provider_label : provider.class.name
   end
 end

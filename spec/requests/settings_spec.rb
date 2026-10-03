@@ -29,19 +29,11 @@ RSpec.describe "Settings", type: :request do
   describe "PATCH /settings" do
     before { sign_in user }
 
-    it "updates RealDebrid key and verifies" do
-      stub_request(:get, "https://api.real-debrid.com/rest/1.0/user")
-        .to_return(status: 200, body: { "username" => "testuser" }.to_json, headers: { 'Content-Type' => 'application/json' })
+    it "ignores debrid keys submitted by users" do
+      patch settings_path, params: { user: { realdebrid_api_key: "user_key", preferred_languages: [ "ENG" ] } }
 
-      patch settings_path, params: { user: { realdebrid_api_key: "new_key_123" } }
       expect(response).to redirect_to(settings_path)
-      expect(user.reload.realdebrid_api_key).to eq("new_key_123")
-    end
-
-    it "preserves existing RD key when blank" do
-      user.update!(realdebrid_api_key: "existing_key")
-      patch settings_path, params: { user: { realdebrid_api_key: "" } }
-      expect(user.reload.realdebrid_api_key).to eq("existing_key")
+      expect(DebridAccount.count).to eq(0)
     end
 
     it "updates preferred languages" do
@@ -51,12 +43,21 @@ RSpec.describe "Settings", type: :request do
     end
   end
 
-  describe "RD key exposure (SEC-08)" do
-    before { sign_in user }
-
-    it "does not leak the plaintext RD key in the settings page body" do
-      user.update!(realdebrid_api_key: "SECRET_KEY_DO_NOT_LEAK")
+  describe "debrid key handling" do
+    it "offers users no debrid key field" do
+      sign_in user
       get settings_path
+
+      expect(response.body).not_to include("api_key")
+      expect(response.body).not_to include(admin_debrid_path)
+    end
+
+    it "links admins to the debrid admin page without leaking the instance key" do
+      create(:debrid_account, :torbox, api_key: "SECRET_KEY_DO_NOT_LEAK")
+      sign_in create(:user, :admin)
+      get settings_path
+
+      expect(response.body).to include(admin_debrid_path)
       expect(response.body).not_to include("SECRET_KEY_DO_NOT_LEAK")
     end
   end

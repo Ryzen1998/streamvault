@@ -101,6 +101,15 @@
 
     <%# MOVIES: show streams directly %>
     <% if @type != "show" %>
+      <% unless streaming_source_available? %>
+        <div class="mt-8 p-4 bg-sv-surface rounded-lg border border-sv-border text-center">
+          <% if admin_user? %>
+            <p class="text-sv-text-muted">Add a TorBox or RealDebrid API key in <%= link_to "Admin → Debrid", admin_debrid_path, class: "text-sv-accent" %> to enable streaming.</p>
+          <% else %>
+            <p class="text-sv-text-muted"><%= Streams::Resolver::NO_SOURCE_MESSAGE %></p>
+          <% end %>
+        </div>
+      <% else %>
       <% if @streams_error.present? %>
         <div class="mt-8 p-4 bg-sv-surface rounded-lg border border-sv-border text-center">
           <p class="text-sv-warning"><%= @streams_error %></p>
@@ -113,7 +122,7 @@
             <div class="flex items-center justify-between gap-3 p-3 bg-sv-surface rounded-lg">
               <div class="min-w-0 flex-1 overflow-hidden">
                 <div class="flex items-center gap-1.5">
-                  <% if stream[:rd_plus] %><span class="badge badge-success shrink-0">RD+</span><% end %>
+                  <% if stream[:cached] %><span class="badge badge-success shrink-0">Cached</span><% end %>
                   <span class="text-sm text-white truncate"><%= stream[:title] || stream[:name] %></span>
                 </div>
                 <div class="flex items-center gap-1.5 mt-1">
@@ -125,18 +134,16 @@
                 </div>
               </div>
               <div class="flex items-center gap-3 shrink-0">
-                <%= button_to "Watch", streaming_index_path, params: { imdb_id: @imdb_id, type: @type, title: @metadata[:title], poster_url: @metadata[:poster_url], duration: @metadata[:runtime_seconds], resolve_url: stream[:resolve_url], filename: stream[:filename], raw_size: stream[:raw_size], video_codec: stream[:video_codec], compatibility_score: stream[:compatibility_score] }, class: "btn-primary text-sm", data: { page_loader: "stream", page_loader_message: "Finding a working stream..." } %>
+                <%= button_to "Watch", streaming_index_path, params: { imdb_id: @imdb_id, type: @type, title: @metadata[:title], poster_url: @metadata[:poster_url], duration: @metadata[:runtime_seconds], stream_token: stream_selection_token(stream) }, class: "btn-primary text-sm", data: { page_loader: "stream", page_loader_message: "Finding a working stream..." } %>
               </div>
             </div>
           <% end %>
         </div>
       <% else %>
         <div class="mt-8 p-4 bg-sv-surface rounded-lg border border-sv-border text-center">
-          <p class="text-sv-text-muted">No streams available for this content.</p>
-          <% unless current_user.has_realdebrid_key? %>
-            <p class="text-sv-text-muted mt-1">Add your RealDebrid API key in <%= link_to "Settings", settings_path, class: "text-sv-accent" %> to enable streaming.</p>
-          <% end %>
+          <p class="text-sv-text-muted mt-1">No streams available for this content.</p>
         </div>
+      <% end %>
       <% end %>
     <% end %>
 

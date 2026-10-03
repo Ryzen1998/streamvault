@@ -6,16 +6,21 @@ class StreamingController < ApplicationController
   layout "player"
   before_action :authenticate_user!
   # stall_telemetry is a diagnostic endpoint — it should work even if
-  # the user hasn't configured an RD key yet (so we can see stalls from
+  # the user hasn't configured a stream source yet (so we can see stalls from
   # the player regardless of auth state).  progress is excluded because
-  # it's a fire-and-forget save that doesn't need the key.
-  before_action :verify_realdebrid_key!, except: [ :progress, :stall_telemetry ]
+  # it's a fire-and-forget save that doesn't need a source.
+  before_action :verify_streaming_source!, except: [ :progress, :stall_telemetry ]
 
   # POST /streaming — start stream, redirect to player page
   def create
     imdb_id = params[:imdb_id]
     type = params[:type]
     return if reject_invalid_imdb_id!(imdb_id) || reject_invalid_content_type!(type)
+
+    selection = { duration: params[:duration] }
+    if params[:stream_token].present?
+      selection[:candidate] = StreamSelection.resolve(token: params[:stream_token], user: current_user)
+    end
 
     result = PlaybackStartService.new(current_user).start(
       imdb_id: imdb_id,
@@ -25,14 +30,7 @@ class StreamingController < ApplicationController
       title: params[:title],
       poster_url: params[:poster_url],
       requested_duration: params[:duration].presence || params[:duration_seconds].presence,
-      selection: {
-        resolve_url: params[:resolve_url],
-        filename: params[:filename],
-        duration: params[:duration],
-        raw_size: params[:raw_size],
-        video_codec: params[:video_codec],
-        compatibility_score: params[:compatibility_score]
-      }
+      selection: selection
     )
 
     if result.success?
@@ -40,6 +38,8 @@ class StreamingController < ApplicationController
     else
       redirect_back fallback_location: root_path, alert: result.error_message
     end
+  rescue StreamSelection::Invalid
+    redirect_back fallback_location: root_path, alert: "That stream link has expired. Pick a stream again."
   end
   def show
     descriptor = PlaybackDescriptor.resolve(token: params[:playback], user: current_user)
@@ -135,9 +135,13 @@ class StreamingController < ApplicationController
 
   private
 
-  def verify_realdebrid_key!
-    unless current_user.has_realdebrid_key?
-      redirect_to settings_path, alert: "RealDebrid API key not configured. Please add it in Settings."
+  def verify_streaming_source!
+    return if streaming_source_available?
+
+    if admin_user?
+      redirect_to admin_debrid_path, alert: "Streaming isn't set up yet. Add a TorBox or RealDebrid API key."
+    else
+      redirect_to root_path, alert: Streams::Resolver::NO_SOURCE_MESSAGE
     end
   end
 end

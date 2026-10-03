@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe "Transcode", type: :request do
-  let(:user) { create(:user, realdebrid_api_key: "test_key") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key") }
   let(:video_mkv_url) { "https://download.real-debrid.com/d/file123/video.mkv" }
   let(:video_mkv_source) { signed_source_for(user, url: video_mkv_url, filename: "video.mkv") }
   let(:inception_url) { "https://download.real-debrid.com/d/file123/Inception.mkv" }

@@ -1,7 +1,8 @@
 require "rails_helper"
 
 RSpec.describe PlaybackStartService do
-  let(:user) { create(:user, realdebrid_api_key: "test_key") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key") }
   let(:resolver) { instance_double(Streams::Resolver) }
   let(:catalog) { instance_double(Catalog::CinemetaClient) }
   let(:source) do
@@ -44,14 +45,15 @@ RSpec.describe PlaybackStartService do
   end
 
   it "resolves an explicit selection and preserves its direct-play hint" do
+    selected = StreamCandidate.new(
+      resolve_url: "https://provider.test/resolve/1",
+      filename: "movie.mp4",
+      raw_size: 1_000,
+      video_codec: "h264",
+      compatibility_score: 100
+    )
     allow(resolver).to receive(:resolve) do |candidate, content_ref:, duration:|
-      expect(candidate).to eq(StreamCandidate.new(
-        resolve_url: "https://provider.test/resolve/1",
-        filename: "movie.mp4",
-        raw_size: 1_000,
-        video_codec: "h264",
-        compatibility_score: 100
-      ))
+      expect(candidate).to eq(selected)
       expect(content_ref).to eq(ContentRef.new(imdb_id: "tt1375666", type: "movie"))
       expect(duration).to eq(7_200)
       ServiceResult.success(source: source, stream: candidate, direct_play_hint: true)
@@ -61,14 +63,7 @@ RSpec.describe PlaybackStartService do
       imdb_id: "tt1375666",
       type: "movie",
       requested_duration: 7_200,
-      selection: {
-        resolve_url: "https://provider.test/resolve/1",
-        filename: "movie.mp4",
-        duration: 7_200,
-        raw_size: 1_000,
-        video_codec: "h264",
-        compatibility_score: 100
-      }
+      selection: { candidate: selected, duration: 7_200 }
     )
 
     expect(result.data.to_h).to include(duration: 7_200, direct_play_hint: true)
@@ -141,5 +136,26 @@ RSpec.describe PlaybackStartService do
     allow(resolver).to receive(:start).and_return(failure)
 
     expect(service.start(imdb_id: "tt1375666", type: "movie")).to equal(failure)
+  end
+
+  it "passes the selected candidate's addon request headers to the resolver" do
+    selected = StreamCandidate.new(
+      resolve_url: "https://addon.test/proxy/abc",
+      filename: "movie.mkv",
+      request_headers: { "User-Agent" => "Stremio" }
+    )
+    allow(resolver).to receive(:resolve) do |candidate, content_ref:, duration:|
+      expect(candidate.request_headers).to eq("User-Agent" => "Stremio")
+      expect(candidate.filename).to eq("movie.mkv")
+      ServiceResult.success(source: source, stream: candidate)
+    end
+
+    result = service.start(
+      imdb_id: "tt1375666",
+      type: "movie",
+      selection: { candidate: selected }
+    )
+
+    expect(result).to be_success
   end
 end

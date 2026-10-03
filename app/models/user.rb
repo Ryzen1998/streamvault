@@ -4,9 +4,6 @@ class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable
 
-  # Encryption
-  encrypts :realdebrid_api_key, deterministic: false
-
   # Associations
   has_many :collection_entries, dependent: :destroy
   has_many :playback_progresses, dependent: :destroy
@@ -30,10 +27,6 @@ class User < ApplicationRecord
   validate :preferred_languages_must_be_array, on: :update
 
   validates :display_name, length: { maximum: 50 }
-
-  def has_realdebrid_key?
-    realdebrid_api_key.present?
-  end
 
   def preferred_stream_languages
     Array(preferred_languages).presence || [ "ENG" ]

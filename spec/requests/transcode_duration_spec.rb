@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe "TranscodeDuration", type: :request do
-  let(:user) { create(:user, realdebrid_api_key: "test_key") }
+  let(:user) { create(:user) }
+  let!(:debrid_account) { create(:debrid_account, api_key: "test_key") }
   let(:media_url) { "https://download.real-debrid.com/d/test.mkv" }
   let(:source_token) { signed_source_for(user, url: media_url, filename: "test.mkv") }
 
