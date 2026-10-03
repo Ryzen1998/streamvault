@@ -118,4 +118,30 @@ RSpec.describe Addons::Client do
       expect(result.data["name"]).to eq("Inception")
     end
   end
+
+  describe "logging" do
+    let(:configured) { "https://user:pass@addon.example.com/stremio/uuid-123/c2VjcmV0LWNvbmZpZw" }
+    let(:log) { StringIO.new }
+    subject(:client) { described_class.new(url: "#{configured}/manifest.json", logger: Logger.new(log)) }
+
+    it "names a failing addon by its origin, never its config path or credentials" do
+      stub_request(:get, /addon\.example\.com/).to_return(status: 503)
+
+      client.manifest
+      client.streams("tt1375666", "movie")
+
+      expect(log.string).to include("[Addons::Client] https://addon.example.com manifest HTTP 503")
+      expect(log.string).to include("[Addons::Client] https://addon.example.com streams HTTP 503")
+      expect(log.string).not_to include("uuid-123", "c2VjcmV0LWNvbmZpZw", "user:pass")
+    end
+
+    it "scrubs the addon URL out of error messages" do
+      stub_request(:get, /addon\.example\.com/).to_raise(StandardError.new("bad URI: #{configured}/stream/movie/tt1.json"))
+
+      client.streams("tt1", "movie")
+
+      expect(log.string).to include("streams error: StandardError: bad URI: https://addon.example.com/stream/movie/tt1.json")
+      expect(log.string).not_to include("uuid-123", "user:pass")
+    end
+  end
 end

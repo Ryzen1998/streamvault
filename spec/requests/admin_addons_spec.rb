@@ -64,6 +64,13 @@ RSpec.describe "Admin::Addons", type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
     end
+
+    it "keeps the addon URL, which can embed debrid keys, out of the request log" do
+      filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+
+      expect(filter.filter("addon" => { "url" => "https://addon.example.com/torbox=KEY/manifest.json", "name" => "Test" }))
+        .to eq("addon" => { "url" => "[FILTERED]", "name" => "Test" })
+    end
   end
 
   describe "PATCH /admin/addons/:id" do

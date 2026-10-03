@@ -6,3 +6,6 @@
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc
 ]
+
+# Stremio addon URLs often embed the addon's config, debrid keys included.
+Rails.application.config.filter_parameters += [ "addon.url" ]

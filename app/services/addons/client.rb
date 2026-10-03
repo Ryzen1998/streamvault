@@ -55,17 +55,17 @@ module Addons
 
       response = @connection.get("#{@base_url}/manifest.json")
       unless response.success? && response.body.is_a?(Hash)
-        @logger.warn("[Addons::Client] manifest HTTP #{response.status} for #{@base_url}")
+        log("manifest HTTP #{response.status}")
         return {}
       end
 
       @cache.write(cache_key, response.body, expires_in: MANIFEST_TTL)
       response.body
     rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
-      @logger.warn("[Addons::Client] manifest #{e.class} for #{@base_url}")
+      log("manifest #{e.class}")
       {}
     rescue StandardError => e
-      @logger.warn("[Addons::Client] manifest error: #{e.class}: #{e.message}")
+      log("manifest error: #{e.class}: #{e.message}")
       {}
     end
 
@@ -95,7 +95,7 @@ module Addons
       elsif response.status == 404
         ServiceResult.success([])
       else
-        @logger.warn("[Addons::Client] streams HTTP #{response.status} for #{@base_url}")
+        log("streams HTTP #{response.status}")
         ServiceResult.failure("Addon returned HTTP #{response.status}")
       end
     rescue Faraday::TimeoutError
@@ -103,7 +103,7 @@ module Addons
     rescue Faraday::ConnectionFailed
       ServiceResult.failure("Could not connect to the addon")
     rescue StandardError => e
-      @logger.warn("[Addons::Client] streams error: #{e.class}: #{e.message}")
+      log("streams error: #{e.class}: #{e.message}")
       ServiceResult.failure("Addon stream request failed")
     end
 
@@ -121,7 +121,7 @@ module Addons
     rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
       ServiceResult.failure("Catalog request failed (#{e.class})")
     rescue StandardError => e
-      @logger.warn("[Addons::Client] catalog error: #{e.class}: #{e.message}")
+      log("catalog error: #{e.class}: #{e.message}")
       ServiceResult.failure("Catalog request failed")
     end
 
@@ -135,7 +135,7 @@ module Addons
     rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
       ServiceResult.failure("Meta request failed (#{e.class})")
     rescue StandardError => e
-      @logger.warn("[Addons::Client] meta error: #{e.class}: #{e.message}")
+      log("meta error: #{e.class}: #{e.message}")
       ServiceResult.failure("Meta request failed")
     end
 
@@ -151,7 +151,7 @@ module Addons
     rescue Faraday::TimeoutError, Faraday::ConnectionFailed => e
       ServiceResult.failure("Subtitles request failed (#{e.class})")
     rescue StandardError => e
-      @logger.warn("[Addons::Client] subtitles error: #{e.class}: #{e.message}")
+      log("subtitles error: #{e.class}: #{e.message}")
       ServiceResult.failure("Subtitles request failed")
     end
 
@@ -206,6 +206,19 @@ module Addons
     end
 
     private
+
+    # Addon paths often carry the user's config (AIOStreams uuid/password,
+    # Torrentio debrid options, base64 config) and with it debrid keys, so the
+    # logs only ever name an addon by its origin.
+    def log(message)
+      message = message.gsub(@base_url, log_label) if @base_url.present?
+      @logger.warn("[Addons::Client] #{log_label} #{message}")
+    end
+
+    def log_label
+      origin = @base_url[%r{\A[a-z][a-z0-9+.-]*://[^/?#]+}i]
+      origin ? origin.sub(%r{(?<=://)[^@]*@}, "") : "[addon]"
+    end
 
     def stream_path(imdb_id, type, season:, episode:)
       if media_type(type) == "series" && season.present? && episode.present?
