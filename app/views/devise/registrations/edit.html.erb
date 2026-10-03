@@ -37,6 +37,6 @@
 
 <h3>Cancel my account</h3>
 
-<div>Unhappy? <%= button_to "Cancel my account", registration_path(resource_name), data: { confirm: "Are you sure?" }, method: :delete %></div>
+<div>Unhappy? <%= button_to "Cancel my account", registration_path(resource_name), method: :delete, form: { data: { controller: "confirm", action: "submit->confirm#ask", confirm_message_value: "Delete your account and everything in it?" } } %></div>
 
 <%= link_to "Back", :back %>

@@ -68,7 +68,9 @@
 
   <% if @account.persisted? %>
     <div class="mt-6">
-      <%= button_to "Remove account", admin_debrid_path, method: :delete, class: "btn-secondary text-sm" %>
+      <%= button_to "Remove account", admin_debrid_path, method: :delete, class: "btn-secondary text-sm",
+            form: { data: { controller: "confirm", action: "submit->confirm#ask",
+                            confirm_message_value: "Remove the debrid account? Streaming stops for everyone until a new key is added." } } %>
       <p class="text-xs text-sv-text-muted mt-1">Streaming stops until a new key is added (or falls back to the environment variables, if set).</p>
     </div>
   <% end %>

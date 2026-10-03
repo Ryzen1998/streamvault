@@ -46,7 +46,7 @@
               <%= button_to "Refresh", refresh_admin_addon_path(addon), class: "btn-secondary text-xs" %>
               <%= link_to "Edit", edit_admin_addon_path(addon), class: "btn-secondary text-xs" %>
               <%= button_to "Remove", admin_addon_path(addon), method: :delete, class: "btn-secondary text-xs",
-                    data: { turbo_confirm: "Remove this addon?" } %>
+                    form: { data: { controller: "confirm", action: "submit->confirm#ask", confirm_message_value: "Remove this addon?" } } %>
             </div>
           </div>
         </div>

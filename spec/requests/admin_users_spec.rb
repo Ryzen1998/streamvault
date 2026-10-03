@@ -24,6 +24,17 @@ RSpec.describe "Admin::Users", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("viewer@example.com", "2h 6m watched", "1 title finished", "last watched")
     end
+
+    it "asks before removing an account" do
+      user
+
+      get admin_users_path
+
+      form = Nokogiri::HTML(response.body).at_css(%(form[action="#{admin_user_path(user)}"]))
+      expect(form["data-controller"]).to eq("confirm")
+      expect(form["data-action"]).to eq("submit->confirm#ask")
+      expect(form["data-confirm-message-value"]).to include("viewer@example.com")
+    end
   end
 
   describe "POST /admin/users" do
