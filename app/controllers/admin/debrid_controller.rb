@@ -29,8 +29,7 @@ module Admin
       end
 
       result = @account.to_debrid.verify
-      @account.verified_at = result.success? ? Time.current : nil
-      @account.last_error = result.success? ? nil : result.error_message
+      @account.apply_verification(result)
       @account.save!
 
       if result.success?

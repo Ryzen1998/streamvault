@@ -2,7 +2,8 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 
-  helper_method :signups_enabled?, :admin_user?, :addons_configured?, :debrid_configured?, :streaming_source_available?
+  helper_method :signups_enabled?, :admin_user?, :addons_configured?, :debrid_configured?, :streaming_source_available?,
+    :expiring_debrid_account
 
   # Whether new user self-registration is enabled via ENV
   def signups_enabled?
@@ -31,6 +32,15 @@ class ApplicationController < ActionController::Base
   # configured the debrid account. Users never supply keys themselves.
   def streaming_source_available?
     addons_configured? || debrid_configured?
+  end
+
+  # The debrid account when its subscription is about to lapse, for the
+  # admin-only warning banner.
+  def expiring_debrid_account
+    return unless admin_user?
+
+    @expiring_debrid_account = DebridAccount.current&.then { |account| account if account.expiring? } unless defined?(@expiring_debrid_account)
+    @expiring_debrid_account
   end
 
 

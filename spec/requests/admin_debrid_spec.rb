@@ -99,4 +99,37 @@ RSpec.describe "Admin::Debrid", type: :request do
       expect(DebridAccount.count).to eq(0)
     end
   end
+
+  describe "subscription expiry" do
+    it "shows the plan and paid-until date" do
+      create(:debrid_account, :torbox, plan: "Pro", expires_at: Time.zone.parse("2027-01-15 12:00"), verified_at: 1.hour.ago)
+      sign_in admin
+
+      get admin_debrid_path
+
+      expect(response.body).to include("Pro plan", "paid until January 15, 2027")
+    end
+
+    it "warns admins on every page when the subscription is about to lapse" do
+      create(:debrid_account, :torbox, expires_at: 3.days.from_now)
+      stub_request(:get, %r{v3-cinemeta\.strem\.io}).to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
+      sign_in admin
+
+      get stats_path
+
+      expect(response.body).to include("TorBox subscription ends", "Streaming stops for everyone")
+    end
+
+    it "doesn't warn regular users or admins with plenty of time left" do
+      create(:debrid_account, :torbox, expires_at: 3.days.from_now)
+      sign_in user
+      get stats_path
+      expect(response.body).not_to include("Streaming stops for everyone")
+
+      DebridAccount.current.update!(expires_at: 60.days.from_now)
+      sign_in admin
+      get stats_path
+      expect(response.body).not_to include("Streaming stops for everyone")
+    end
+  end
 end

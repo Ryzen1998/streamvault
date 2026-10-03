@@ -17,6 +17,11 @@
       <% elsif @account.last_error.present? %>
         <p class="text-xs text-sv-warning mt-1">Last check failed: <%= @account.last_error %></p>
       <% end %>
+      <% if @account.plan.present? || @account.expires_at %>
+        <p class="text-xs mt-1 <%= @account.expiring? ? "text-sv-warning" : "text-sv-text-muted" %>">
+          <%= [ @account.plan.presence && "#{@account.plan} plan", @account.expires_at && (@account.expired? ? "expired #{@account.expires_at.to_date.to_fs(:long)}" : "paid until #{@account.expires_at.to_date.to_fs(:long)} (#{distance_of_time_in_words_to_now(@account.expires_at)} left)") ].compact.join(" · ") %>
+        </p>
+      <% end %>
     </div>
   <% elsif @environment_account %>
     <div class="bg-sv-surface rounded-xl p-5 border border-sv-border mb-6">

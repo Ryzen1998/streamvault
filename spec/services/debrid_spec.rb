@@ -65,5 +65,22 @@ RSpec.describe Debrid do
 
       expect(account.verify).to be_success
     end
+
+    it "reads the TorBox plan and paid-until date" do
+      stub_request(:get, "https://api.torbox.app/v1/api/user/me")
+        .to_return(status: 200, body: { success: true, data: { plan: 2, premium_expires_at: "2026-11-01T00:00:00Z" } }.to_json,
+          headers: { "Content-Type" => "application/json" })
+
+      expect(account.verify.data).to eq(plan: "Pro", expires_at: Time.zone.parse("2026-11-01T00:00:00Z"))
+    end
+
+    it "reads the RealDebrid account type and expiration" do
+      realdebrid = described_class.new(service: "realdebrid", api_key: "rd_key")
+      stub_request(:get, "https://api.real-debrid.com/rest/1.0/user")
+        .to_return(status: 200, body: { type: "premium", expiration: "2026-10-05T10:00:00.000Z" }.to_json,
+          headers: { "Content-Type" => "application/json" })
+
+      expect(realdebrid.verify.data).to eq(plan: "Premium", expires_at: Time.zone.parse("2026-10-05T10:00:00Z"))
+    end
   end
 end

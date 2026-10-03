@@ -22,6 +22,9 @@ module Debrid
     }
   }.freeze
 
+  # TorBox's numeric plan ids, as its user API returns them.
+  TORBOX_PLANS = { 0 => "Free", 1 => "Essential", 2 => "Pro", 3 => "Standard" }.freeze
+
   Account = Struct.new(:service, :api_key, keyword_init: true) do
     def name
       SERVICES.fetch(service)[:name]
@@ -44,9 +47,21 @@ module Debrid
       api_key.present? ? text.to_s.gsub(api_key, "[REDACTED]") : text.to_s
     end
 
+    # → ServiceResult with the subscription: { plan:, expires_at: }.
     def verify
       client = torbox? ? TorboxService.new(api_key) : RealDebridService.new(api_key)
-      client.verify_key
+      result = client.verify_key
+      return result if result.failure?
+
+      ServiceResult.success(subscription(result.data.is_a?(Hash) ? result.data : {}))
+    end
+
+    def subscription(user)
+      if torbox?
+        { plan: TORBOX_PLANS[Integer(user["plan"], exception: false)], expires_at: Debrid.parse_time(user["premium_expires_at"]) }
+      else
+        { plan: user["type"].to_s.capitalize.presence, expires_at: Debrid.parse_time(user["expiration"]) }
+      end
     end
 
     # Keep the key out of logs and error messages.
@@ -79,5 +94,11 @@ module Debrid
     return if api_key.blank? || !SERVICES.key?(service)
 
     Account.new(service: service, api_key: api_key)
+  end
+
+  def parse_time(value)
+    Time.zone.parse(value.to_s) if value.present?
+  rescue ArgumentError
+    nil
   end
 end

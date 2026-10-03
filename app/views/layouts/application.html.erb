@@ -157,6 +157,14 @@
             </div>
           </header>
 
+          <% if (lapsing = expiring_debrid_account) %>
+            <div class="mx-6 mt-4 rounded-lg border border-sv-warning/40 bg-sv-warning/10 px-4 py-3 text-sm text-sv-text" role="status">
+              <%= lapsing.service_name %> subscription <%= lapsing.expired? ? "has expired" : "ends #{lapsing.expires_at.to_date.to_fs(:long)}" %>.
+              Streaming stops for everyone when it lapses.
+              <%= link_to "Admin → Debrid", admin_debrid_path, class: "text-sv-accent font-medium hover:underline" %>
+            </div>
+          <% end %>
+
           <%# Flash messages %>
           <% if notice.present? %>
             <div class="flash-notice mx-6 mt-4" data-controller="flash" data-flash-target="message">
