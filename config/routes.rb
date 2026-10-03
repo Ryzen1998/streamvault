@@ -60,6 +60,14 @@ Rails.application.routes.draw do
   get "settings", to: "settings#show", as: :settings
   patch "settings", to: "settings#update"
 
+  # Per-account Simkl link (PIN pairing, history sync)
+  scope "settings" do
+    resource :simkl, only: [ :show, :create, :destroy ], controller: "simkl" do
+      get :status
+      post :sync
+    end
+  end
+
   # Admin — debrid account and addon management (admin users only)
   namespace :admin do
     resources :users, only: [ :index, :new, :create, :edit, :update, :destroy ] do

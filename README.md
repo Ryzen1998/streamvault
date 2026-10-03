@@ -116,6 +116,7 @@ StreamVault relies on several external services. Here's what each one does and h
 | **OMDB** | Enriches content with IMDb, Rotten Tomatoes, and Metacritic ratings | Yes | Get a free API key at [omdbapi.com/apikey.aspx](https://www.omdbapi.com/apikey.aspx) |
 | **TMDB** | Powers the "Recommended for You" feature using your watch history | Optional | Create an account at [themoviedb.org](https://www.themoviedb.org), then get a Read Access Token at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) |
 | **SubDL** | Provides external subtitles when embedded ones aren't available | Optional | Get a free API key at [subdl.com/panel/api](https://subdl.com/panel/api) |
+| **Simkl** | Per-account watch tracking: finished movies and episodes go to each user's own Simkl history | Optional | Create an app at [simkl.com/settings/developer/new](https://simkl.com/settings/developer/new/) and set `SIMKL_CLIENT_ID`. Users link their own account under **Settings → Simkl** |
 
 ### How the services work together
 
@@ -246,6 +247,7 @@ docker compose up -d --build
 | `OMDB_API_KEY` | OMDB API key for ratings metadata | Required |
 | `TMDB_READ_ACCESS_TOKEN` | TMDB v4 bearer token for recommendations | Optional |
 | `SUBDL_API_KEY` | SubDL API key for external subtitle fallback | Optional |
+| `SIMKL_CLIENT_ID` | Simkl app client id; lets each account link Simkl and track what it watches | Optional |
 | `TORRENTIO_PROXY` | Forward proxy URL for Torrentio requests (if IP is blocked) | Optional |
 | `CINEMETA_PROXY` | Forward proxy URL for Cinemeta requests (if needed) | Optional |
 | `COMET_PROXY` | Forward proxy URL for Comet requests (if needed) | Optional |

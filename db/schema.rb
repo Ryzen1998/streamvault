@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_03_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_03_150000) do
   create_table "addons", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
@@ -72,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_140000) do
     t.string "poster_url"
     t.integer "progress_seconds", default: 0, null: false
     t.integer "season_number", default: 0, null: false
+    t.datetime "simkl_synced_at"
     t.string "title", null: false
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
@@ -80,6 +81,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_140000) do
     t.index ["user_id", "imdb_id"], name: "idx_playback_progresses_content"
     t.index ["user_id"], name: "index_playback_progresses_on_user_id"
     t.index ["watched_at"], name: "index_playback_progresses_on_watched_at"
+  end
+
+  create_table "simkl_connections", force: :cascade do |t|
+    t.text "access_token", null: false
+    t.datetime "created_at", null: false
+    t.text "last_error"
+    t.datetime "last_synced_at"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.string "username"
+    t.index ["user_id"], name: "index_simkl_connections_on_user_id", unique: true
   end
 
   create_table "solid_cache_entries", force: :cascade do |t|
@@ -234,6 +246,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_140000) do
   add_foreign_key "collection_entries", "users"
   add_foreign_key "hls_sessions", "users"
   add_foreign_key "playback_progresses", "users"
+  add_foreign_key "simkl_connections", "users"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

@@ -76,6 +76,31 @@
     <%= f.submit "Save Settings", class: "btn-primary cursor-pointer" %>
   <% end %>
 
+  <% if SimklClient.configured? %>
+    <% simkl = @user.simkl_connection %>
+    <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
+      <h2 class="text-lg font-semibold text-white mb-2">Simkl</h2>
+      <p class="text-xs text-sv-text-muted mb-4">
+        Track what you watch on your <a href="https://simkl.com" target="_blank" rel="noopener" class="text-sv-accent">Simkl</a> profile.
+        Movies and episodes you finish here are added to your Simkl history, including ones you finished before linking.
+      </p>
+      <% if simkl %>
+        <p class="text-sm text-sv-text">Linked as <span class="font-medium text-white"><%= simkl.username.presence || "your Simkl account" %></span></p>
+        <% if simkl.last_error.present? %>
+          <p class="text-xs text-sv-warning mt-1">Last sync failed: <%= simkl.last_error %></p>
+        <% elsif simkl.last_synced_at %>
+          <p class="text-xs text-sv-text-muted mt-1">Last synced <%= time_ago_in_words(simkl.last_synced_at) %> ago.</p>
+        <% end %>
+        <div class="flex items-center gap-3 mt-4">
+          <%= button_to "Sync now", sync_simkl_path, class: "btn-secondary text-sm" %>
+          <%= button_to "Unlink", simkl_path, method: :delete, class: "btn-secondary text-sm" %>
+        </div>
+      <% else %>
+        <%= button_to "Link Simkl", simkl_path, class: "btn-primary text-sm" %>
+      <% end %>
+    </div>
+  <% end %>
+
   <% if admin_user? %>
     <div class="bg-sv-surface rounded-xl p-6 border border-sv-border mt-6">
       <h2 class="text-lg font-semibold text-white mb-4">Administration</h2>

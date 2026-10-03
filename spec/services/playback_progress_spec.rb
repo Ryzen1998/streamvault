@@ -24,6 +24,26 @@ RSpec.describe Playback::ProgressWriter do
     expect(RefreshRecommendationsJob).to have_received(:enqueue_debounced).once
   end
 
+  describe "Simkl sync" do
+    around { |example| with_simkl_client_id { example.run } }
+
+    it "queues a Simkl sync once, when a title first counts as finished" do
+      create(:simkl_connection, user: user)
+
+      expect {
+        writer.call(content_ref: movie, progress_seconds: 3_600, duration_seconds: 7_200, title: "Inception")
+        writer.call(content_ref: movie, progress_seconds: 7_000, duration_seconds: 7_200, title: "Inception")
+        writer.call(content_ref: movie, progress_seconds: 7_100, duration_seconds: 7_200, title: "Inception")
+      }.to have_enqueued_job(SimklHistorySyncJob).with(user.id).exactly(:once)
+    end
+
+    it "does nothing for accounts without Simkl" do
+      expect {
+        writer.call(content_ref: movie, progress_seconds: 7_100, duration_seconds: 7_200, title: "Inception")
+      }.not_to have_enqueued_job(SimklHistorySyncJob)
+    end
+  end
+
   it "keeps separate episode rows in the same show" do
     writer.call(content_ref: episode, progress_seconds: 600, duration_seconds: 2_400, title: "Breaking Bad")
     second = ContentRef.new(imdb_id: episode.imdb_id, type: "show", season: 1, episode: 2)
